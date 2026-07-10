@@ -83,7 +83,7 @@ export function FacturesList() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [factureToDelete, setFactureToDelete] = useState<number | null>(null);
   // Pending status change awaiting confirmation. `kind` selects which
-  // explanatory popup to show: 'cancel' (? annulÈe) or 'status' (? payÈe /
+  // explanatory popup to show: 'cancel' (? annul√©e) or 'status' (? pay√©e /
   // reste_a_payer). `statusLabel` is the human label for the target status.
   const [statusConfirm, setStatusConfirm] = useState<
     { id: number; newStatut: string; kind: 'status' | 'cancel'; statusLabel: string } | null
@@ -104,8 +104,8 @@ export function FacturesList() {
     { value: 'brouillon', label: t('shared.status.draft'), icon: FileText, color: 'text-sky-700', bgColor: 'dark:bg-sky-500/10 dark:text-sky-400 dark:border-sky-500/20 bg-sky-50 text-sky-700 border border-sky-200/50' },
     { value: 'en_attente', label: t('shared.status.pending'), icon: Clock, color: 'text-rose-700', bgColor: 'dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20 bg-rose-50 text-rose-700 border border-rose-200/50' },
     { value: 'reste_a_payer', label: t('shared.status.partial'), icon: AlertCircle, color: 'text-orange-700', bgColor: 'dark:bg-amber-500/10 dark:text-amber-400 dark:border-amber-500/20 bg-orange-50 text-orange-700 border border-orange-200/50' },
-    { value: 'payÈe', label: t('shared.status.paid'), icon: CheckCircle, color: 'text-emerald-700', bgColor: 'dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 bg-emerald-50 text-emerald-700 border border-emerald-200/50' },
-    { value: 'annulÈe', label: t('shared.status.cancelled'), icon: Ban, color: 'text-red-700', bgColor: 'dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20 bg-red-50 text-red-700 border border-red-200/50' },
+    { value: 'pay√©e', label: t('shared.status.paid'), icon: CheckCircle, color: 'text-emerald-700', bgColor: 'dark:bg-emerald-500/10 dark:text-emerald-400 dark:border-emerald-500/20 bg-emerald-50 text-emerald-700 border border-emerald-200/50' },
+    { value: 'annul√©e', label: t('shared.status.cancelled'), icon: Ban, color: 'text-red-700', bgColor: 'dark:bg-rose-500/10 dark:text-rose-400 dark:border-rose-500/20 bg-red-50 text-red-700 border border-red-200/50' },
   ];
 
   const handlePrint = useReactToPrint({
@@ -320,7 +320,7 @@ export function FacturesList() {
     try {
       const { error } = await supabase
         .from('factures')
-        .update({ statut: 'payÈe', reste_a_payer: 0 })
+        .update({ statut: 'pay√©e', reste_a_payer: 0 })
         .eq('id', id)
         .eq('user_id', user?.id);
       if (error) throw error;
@@ -356,7 +356,7 @@ export function FacturesList() {
     try {
       // If the remaining amount reaches 0, the invoice is fully paid.
       const updateData: any = { reste_a_payer: newReste };
-      if (newReste === 0) updateData.statut = 'payÈe';
+      if (newReste === 0) updateData.statut = 'pay√©e';
 
       const { error } = await supabase
         .from('factures')
@@ -364,6 +364,15 @@ export function FacturesList() {
         .eq('id', editMontant.id)
         .eq('user_id', user?.id);
       if (error) throw error;
+
+      // Ensure a linked BL client exists (facture is active: reste_a_payer or
+      // now pay√©e). De-duplicated, so this is a no-op if one already exists.
+      try {
+        await createBLClientForFacture(editMontant.id);
+      } catch (blcError) {
+        console.error('Error auto-creating BL client:', blcError);
+      }
+
       toast.success(t('factures.toast_remaining_updated'));
       setEditMontant(null);
       fetchFactures();
@@ -379,7 +388,7 @@ export function FacturesList() {
       .eq('id', factureId)
       .single();
 
-    if (fetchError || !factureData) throw new Error('Facture non trouvÈe');
+    if (fetchError || !factureData) throw new Error('Facture non trouv√©e');
 
     const { data: lignesData } = await supabase
       .from('facture_lignes')
@@ -414,7 +423,7 @@ export function FacturesList() {
         montant_ht: factureData.montant_ht,
         montant_tva: factureData.montant_tva,
         montant_ttc: factureData.montant_ttc,
-        statut: 'GÈnÈrÈ',
+        statut: 'G√©n√©r√©',
         notes: `Avoir pour annulation de la facture ${factureData.numero}`,
       }])
       .select()
@@ -428,7 +437,7 @@ export function FacturesList() {
         if (m) { const n = parseInt(m[1], 10); if (n > mn) mn = n; }
       }
       numeroAvoir = `AV-${year}-${String(mn + 1).padStart(4, '0')}`;
-      const retry = await supabase.from('avoirs').upsert([{ user_id: user?.id, numero: numeroAvoir, facture_id: factureData.id, client_id: factureData.client_id, date_emission: new Date().toISOString(), montant_ht: factureData.montant_ht, montant_tva: factureData.montant_tva, montant_ttc: factureData.montant_ttc, statut: 'GÈnÈrÈ', notes: `Avoir pour annulation de la facture ${factureData.numero}` }]).select().single();
+      const retry = await supabase.from('avoirs').upsert([{ user_id: user?.id, numero: numeroAvoir, facture_id: factureData.id, client_id: factureData.client_id, date_emission: new Date().toISOString(), montant_ht: factureData.montant_ht, montant_tva: factureData.montant_tva, montant_ttc: factureData.montant_ttc, statut: 'G√©n√©r√©', notes: `Avoir pour annulation de la facture ${factureData.numero}` }]).select().single();
       avoirData = retry.data;
       avoirError = retry.error;
     }
@@ -454,12 +463,143 @@ export function FacturesList() {
     return { id: avoirData.id, numero: numeroAvoir };
   };
 
+  /**
+   * Auto-create a Bon de Livraison Client linked to a facture.
+   *
+   * Fired when a facture moves to an "active" status (pay√©e / reste_a_payer).
+   * The BL client copies the facture's client, montants and lignes and is
+   * linked back through `bons_livraison_client.facture_id`.
+   *
+   * De-dup: a facture can transition several times (e.g. reste_a_payer ->
+   * pay√©e), so we first check whether a BLC already exists for this
+   * facture_id and skip creation if so. Returns null when skipped.
+   *
+   * IMPORTANT: this MUST NOT touch stock ‚Äî the facture status transition
+   * already deducts stock in handleStatusChange. Creating the BLC is purely
+   * a document operation.
+   */
+  const createBLClientForFacture = async (
+    factureId: number,
+  ): Promise<{ id: number; numero: string } | null> => {
+    // Skip if a BL client is already linked to this facture.
+    const { data: existingBlc } = await supabase
+      .from('bons_livraison_client')
+      .select('id, numero')
+      .eq('facture_id', factureId)
+      .eq('user_id', user?.id)
+      .maybeSingle();
+    if (existingBlc) return null;
+
+    const { data: factureData, error: fetchError } = await supabase
+      .from('factures')
+      .select('*, client:clients(*)')
+      .eq('id', factureId)
+      .single();
+    if (fetchError || !factureData) throw new Error('Facture non trouv√©e');
+
+    const { data: lignesData } = await supabase
+      .from('facture_lignes')
+      .select('*')
+      .eq('facture_id', factureId)
+      .order('ordre');
+
+    // Per-user numero: BLC-<year>-<0000>.
+    let numeroBlc: string | undefined;
+    const year = new Date().getFullYear();
+    let attempts = 0;
+    while (!numeroBlc && attempts < 10) {
+      const { data: existing } = await supabase
+        .from('bons_livraison_client')
+        .select('numero')
+        .like('numero', `BLC-${year}-%`)
+        .eq('user_id', user?.id);
+      let maxNum = 0;
+      for (const b of existing || []) {
+        const match = b.numero?.match(new RegExp(`^BLC-${year}-(\\d+)$`));
+        if (match) { const n = parseInt(match[1], 10); if (n > maxNum) maxNum = n; }
+      }
+      const candidate = `BLC-${year}-${String(maxNum + 1).padStart(4, '0')}`;
+      const { data: dup } = await supabase
+        .from('bons_livraison_client')
+        .select('id')
+        .eq('numero', candidate)
+        .eq('user_id', user?.id)
+        .maybeSingle();
+      if (!dup) { numeroBlc = candidate; break; }
+      attempts++;
+    }
+
+    const headerPayload = {
+      user_id: user?.id,
+      numero: numeroBlc,
+      facture_id: factureData.id,
+      client_id: factureData.client_id,
+      date_livraison: new Date().toISOString(),
+      statut: 'en_attente',
+      montant_ht: factureData.montant_ht,
+      montant_tva: factureData.montant_tva,
+      montant_ttc: factureData.montant_ttc,
+      notes: `Bon de livraison g√©n√©r√© pour la facture ${factureData.numero}`,
+    };
+
+    let { data: blcData, error: blcError } = await supabase
+      .from('bons_livraison_client')
+      .insert([headerPayload])
+      .select()
+      .single();
+
+    if (blcError?.message?.includes('duplicate key') || blcError?.code === '23505') {
+      const { data: all } = await supabase
+        .from('bons_livraison_client')
+        .select('numero')
+        .like('numero', `BLC-${year}-%`)
+        .eq('user_id', user?.id);
+      let mn = 0;
+      for (const b of all || []) {
+        const m = b.numero?.match(new RegExp(`^BLC-${year}-(\\d+)$`));
+        if (m) { const n = parseInt(m[1], 10); if (n > mn) mn = n; }
+      }
+      numeroBlc = `BLC-${year}-${String(mn + 1).padStart(4, '0')}`;
+      const retry = await supabase
+        .from('bons_livraison_client')
+        .insert([{ ...headerPayload, numero: numeroBlc }])
+        .select()
+        .single();
+      blcData = retry.data;
+      blcError = retry.error;
+    }
+    if (blcError) throw blcError;
+
+    if (lignesData && lignesData.length > 0) {
+      const lignesPayload = lignesData.map((l: any, index: number) => ({
+        bon_livraison_client_id: blcData.id,
+        produit_id: l.produit_id,
+        reference: l.reference || '',
+        designation: l.designation || '',
+        quantite: Number(l.quantite || 0),
+        prix_unitaire_ht: Number(l.prix_unitaire_ht || 0),
+        tva: Number(l.tva ?? 20),
+        remise: Number(l.remise || 0),
+        prix_vente_ttc: Number(l.prix_vente_ttc || 0),
+        montant_ht: Number(l.montant_ht || 0),
+        montant_ttc: Number(l.montant_ttc || 0),
+        ordre: index,
+      }));
+      const { error: lignesError } = await supabase
+        .from('bon_livraison_client_lignes')
+        .insert(lignesPayload);
+      if (lignesError) throw lignesError;
+    }
+
+    return { id: blcData.id, numero: numeroBlc as string };
+  };
+
   const handleAnnuler = async (facture: Facture) => {
     try {
       const { numero: numeroAvoir } = await createAvoirForFacture(facture.id);
 
       // Mirror the stock logic from handleStatusChange: cancelling an
-      // invoice that was active (payÈe / reste_a_payer) and had its stock
+      // invoice that was active (pay√©e / reste_a_payer) and had its stock
       // deducted must put the sold quantities back into stock.
       const { data: current } = await supabase
         .from('factures')
@@ -469,10 +609,10 @@ export function FacturesList() {
 
       const oldStatut = current?.statut;
       const stockUpdated = current?.stock_updated ?? false;
-      const activeStatuses = ['payÈe', 'reste_a_payer'];
+      const activeStatuses = ['pay√©e', 'reste_a_payer'];
       const wasActive = activeStatuses.includes(oldStatut);
 
-      const updateData: any = { statut: 'annulÈe' };
+      const updateData: any = { statut: 'annul√©e' };
 
       if (wasActive && stockUpdated) {
         const { data: lignes } = await supabase
@@ -561,7 +701,7 @@ export function FacturesList() {
     try {
       const { data: facture } = await supabase.from('factures').select('statut, stock_updated').eq('id', id).single();
 
-      if (facture?.statut === 'annulÈe' && newStatut !== 'annulÈe') {
+      if (facture?.statut === 'annul√©e' && newStatut !== 'annul√©e') {
         const { data: avoir } = await supabase.from('avoirs').select('id').eq('facture_id', id).single();
         if (avoir) {
           await supabase.from('avoir_lignes').delete().eq('avoir_id', avoir.id);
@@ -572,20 +712,20 @@ export function FacturesList() {
       const oldStatut = facture?.statut;
       const stockUpdated = facture?.stock_updated ?? false;
       const updateData: any = { statut: newStatut };
-      if (newStatut === 'payÈe') {
+      if (newStatut === 'pay√©e') {
         updateData.reste_a_payer = 0;
       }
 
       // Create avoir BEFORE updating status (transaction integrity)
-      if (newStatut === 'annulÈe' && oldStatut && oldStatut !== 'annulÈe') {
+      if (newStatut === 'annul√©e' && oldStatut && oldStatut !== 'annul√©e') {
         await createAvoirForFacture(id);
       }
 
-      const activeStatuses = ['payÈe', 'reste_a_payer'];
+      const activeStatuses = ['pay√©e', 'reste_a_payer'];
       const wasActive = activeStatuses.includes(oldStatut);
       const isActive = activeStatuses.includes(newStatut);
 
-      // Stock update logic ó protected by stock_updated flag
+      // Stock update logic ‚Äî protected by stock_updated flag
       const changedIds: (number | string)[] = [];
       if (isActive && !wasActive && !stockUpdated) {
         const { data: lignes } = await supabase
@@ -628,6 +768,18 @@ export function FacturesList() {
         .eq('id', id)
         .eq('user_id', user?.id);
       if (error) throw error;
+
+      // Auto-create a linked Bon de Livraison Client when the facture becomes
+      // active (pay√©e / reste_a_payer). De-duplicated inside the helper, so a
+      // reste_a_payer -> pay√©e transition won't create a second one.
+      if (isActive) {
+        try {
+          await createBLClientForFacture(id);
+        } catch (blcError) {
+          console.error('Error auto-creating BL client:', blcError);
+        }
+      }
+
       toast.success(t('shared.toast.status_updated'));
       fetchFactures();
     } catch (error) {
@@ -636,39 +788,39 @@ export function FacturesList() {
   };
 
   // Targets that require an explicit confirmation (irreversible / locking).
-  const lockingStatuses = ['payÈe', 'reste_a_payer', 'annulÈe'];
+  const lockingStatuses = ['pay√©e', 'reste_a_payer', 'annul√©e'];
 
-  // The status dropdown is frozen once the facture is "payÈe" or "annulÈe".
+  // The status dropdown is frozen once the facture is "pay√©e" or "annul√©e".
   // "reste_a_payer" stays editable so it can still be moved forward to
-  // "payÈe" (but never back to brouillon / en_attente ó see below).
+  // "pay√©e" (but never back to brouillon / en_attente ‚Äî see below).
   const isStatusLocked = (statut?: string | null) =>
-    statut === 'payÈe' || statut === 'annulÈe';
+    statut === 'pay√©e' || statut === 'annul√©e';
 
-  // "annulÈe" is fully terminal ó no transition of any kind is allowed.
-  const isStatusTerminal = (statut?: string | null) => statut === 'annulÈe';
+  // "annul√©e" is fully terminal ‚Äî no transition of any kind is allowed.
+  const isStatusTerminal = (statut?: string | null) => statut === 'annul√©e';
 
   const statusLabelOf = (value: string) =>
     statusOptions.find(o => o.value === value)?.label ?? value;
 
   /**
    * Entry point from the status dropdown. Moving a facture to a locking
-   * status (payÈe / reste_a_payer / annulÈe) is irreversible, so we ask
+   * status (pay√©e / reste_a_payer / annul√©e) is irreversible, so we ask
    * for an explicit confirmation that explains the consequence before
    * applying it. Every other transition is applied directly as before.
    *
-   * From "reste_a_payer" only forward moves are allowed (? payÈe / annulÈe);
+   * From "reste_a_payer" only forward moves are allowed (? pay√©e / annul√©e);
    * reverting to brouillon / en_attente is blocked.
    */
   const requestStatusChange = (id: number, newStatut: string, currentStatut: string) => {
-    if (isStatusTerminal(currentStatut)) return; // annulÈe ó no change allowed
+    if (isStatusTerminal(currentStatut)) return; // annul√©e ‚Äî no change allowed
     if (newStatut === currentStatut) return;
 
     // Block reverting a partially-paid invoice back to an earlier status.
-    if (currentStatut === 'reste_a_payer' && newStatut !== 'payÈe' && newStatut !== 'annulÈe') {
+    if (currentStatut === 'reste_a_payer' && newStatut !== 'pay√©e' && newStatut !== 'annul√©e') {
       return;
     }
 
-    if (newStatut === 'annulÈe') {
+    if (newStatut === 'annul√©e') {
       setStatusConfirm({ id, newStatut, kind: 'cancel', statusLabel: statusLabelOf(newStatut) });
       return;
     }
@@ -769,15 +921,15 @@ export function FacturesList() {
   );
 
   const totalFactures = factures.length;
-  const facturesPayees = factures.filter(f => f.statut === 'payÈe').length;
+  const facturesPayees = factures.filter(f => f.statut === 'pay√©e').length;
   const facturesEnAttente = factures.filter(f => ['en_attente', 'reste_a_payer'].includes(f.statut)).length;
   const totalMontant = filteredFactures.reduce((sum, f) => sum + (f.montantTtc || 0), 0);
   const totalResteAPayer = filteredFactures.reduce((sum, f) => sum + (f.resteAPayer || 0), 0);
 
   // Summary sidebar is linked to the active filters (search / status /
-  // period): it summarises the "payÈe ou reste ‡ payer" invoices within
+  // period): it summarises the "pay√©e ou reste √† payer" invoices within
   // the currently filtered list.
-  const paid30 = filteredFactures.filter(f => ['payÈe', 'reste_a_payer'].includes(f.statut));
+  const paid30 = filteredFactures.filter(f => ['pay√©e', 'reste_a_payer'].includes(f.statut));
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1081,10 +1233,10 @@ export function FacturesList() {
                                 <SelectContent>
                                   {statusOptions
                                     // When partially paid, the only allowed
-                                    // moves are ? payÈe or ? annulÈe.
+                                    // moves are ? pay√©e or ? annul√©e.
                                     .filter(opt =>
                                       facture.statut === 'reste_a_payer'
-                                        ? opt.value === 'payÈe' || opt.value === 'annulÈe'
+                                        ? opt.value === 'pay√©e' || opt.value === 'annul√©e'
                                         : true
                                     )
                                     .map(opt => {
@@ -1103,12 +1255,12 @@ export function FacturesList() {
                             </TableCell>
                             <TableCell className="px-4 py-4 text-start">
                               <div className="flex justify-end gap-0.5">
-                                {!['payÈe', 'annulÈe'].includes(facture.statut) && (
+                                {!['pay√©e', 'annul√©e'].includes(facture.statut) && (
                                   <Button
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8 dark:text-muted-foreground dark:hover:text-emerald-400 dark:hover:bg-emerald-500/10 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-sm"
-                                    onClick={() => requestStatusChange(facture.id, 'payÈe', String(facture.statut ?? ''))}
+                                    onClick={() => requestStatusChange(facture.id, 'pay√©e', String(facture.statut ?? ''))}
                                     title={t('factures.tooltip_mark_paid')}
                                   >
                                     <CheckCircle className="h-4 w-4" />
@@ -1150,7 +1302,7 @@ export function FacturesList() {
                                     variant="ghost"
                                     size="icon"
                                     className="h-8 w-8 dark:text-muted-foreground dark:hover:text-red-400 dark:hover:bg-red-500/10 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-sm"
-                                    onClick={() => requestStatusChange(facture.id, 'annulÈe', String(facture.statut ?? ''))}
+                                    onClick={() => requestStatusChange(facture.id, 'annul√©e', String(facture.statut ?? ''))}
                                     title={t('factures.tooltip_cancel')}
                                   >
                                     <Ban className="h-4 w-4" />

@@ -270,6 +270,7 @@
     "delivery_notes": "Delivery Notes",
     "delivery_notes_client": "Delivery Notes",
     "purchase_orders": "Purchase Orders",
+    "remises": "Discounts",
     "expenses": "Expenses",
     "supplier_credit_notes": "Supplier Credit Notes",
     "clients": "Clients",
@@ -321,6 +322,7 @@
       "delivery_notes": "Delivery tracking",
       "delivery_notes_client": "Client delivery notes",
       "purchase_orders": "Purchase order management",
+      "remises": "Purchase order discounts",
       "expenses": "Expense tracking",
       "supplier_credit_notes": "Supplier credit notes & returns",
       "clients": "Customer portfolio management",
@@ -971,7 +973,13 @@
     "confirm_cancel_title":   "Confirm cancellation",
     "confirm_cancel_body":    "Once cancelled, this purchase order can no longer be changed to another status. Do you want to continue?",
     "confirm_button":         "Confirm",
-    "cancel_button":          "Cancel"
+    "cancel_button":          "Cancel",
+    "form_bl_fournisseur_label": "Supplier Delivery Note No.",
+    "form_bl_fournisseur_ph":    "Supplier's delivery note number",
+    "form_motif_annulation_label": "Cancellation reason",
+    "form_motif_annulation_ph":    "Reason for cancelling this purchase order...",
+    "form_locked_delivered_hint":  "Delivered purchase order: only the Supplier Delivery Note No. remains editable.",
+    "form_locked_cancelled_hint":  "Cancelled purchase order: only the Supplier Delivery Note No. and the cancellation reason remain editable."
   },
   "bons_livraison": {
     "page_title":      "Delivery Notes",
@@ -1320,6 +1328,26 @@
     "col_price_ttc":   "Price (incl.)",
     "col_stock":       "Stock",
     "col_actions":     "Actions"
+  },
+  "remises": {
+    "page_title":      "Discounts",
+    "page_subtitle":   "View the discounts defined in purchase orders",
+    "search_ph":       "Search by product, barcode, supplier...",
+    "loading":         "Loading discounts...",
+    "empty_filtered":  "No results found",
+    "empty_all":       "No products recorded",
+    "toast_load_error":"Error",
+    "sidebar_title":   "Discounts Overview",
+    "sidebar_total_products": "Total products",
+    "sidebar_with_remise":    "Lines with discount",
+    "sidebar_avg_remise":     "Average discount",
+    "sidebar_no_bc":          "Products without PO",
+    "col_product":     "Product",
+    "col_supplier":    "Supplier",
+    "col_qty_bc":      "PO Qty",
+    "col_stock":       "Remaining Qty",
+    "col_buy_price":   "Buy Price (incl.)",
+    "col_remise":      "Discount"
   },
   "transactions": {
     "page_title":      "Transactions",

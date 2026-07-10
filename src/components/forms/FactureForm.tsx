@@ -183,6 +183,117 @@ export function FactureForm({ initialData, onSuccess }: FactureFormProps) {
     return `FAC-${year}-${String(maxNum + 1).padStart(4, '0')}`;
   }
 
+  /**
+   * Auto-create a Bon de Livraison Client linked to a facture that has just
+   * been saved with an active status (payée / reste_a_payer).
+   *
+   * De-duplicated by `facture_id`: if a BLC already exists for this facture
+   * (e.g. when editing), nothing is created. Never touches stock — the
+   * facture save already handles stock deduction.
+   */
+  async function createBLClientForFacture(
+    factureId: number,
+    factureHeader: any,
+    factureLignes: any[],
+  ): Promise<void> {
+    const { data: existingBlc } = await supabase
+      .from('bons_livraison_client')
+      .select('id')
+      .eq('facture_id', factureId)
+      .eq('user_id', user?.id)
+      .maybeSingle();
+    if (existingBlc) return;
+
+    const year = new Date().getFullYear();
+    let numeroBlc: string | undefined;
+    let attempts = 0;
+    while (!numeroBlc && attempts < 10) {
+      const { data: existing } = await supabase
+        .from('bons_livraison_client')
+        .select('numero')
+        .like('numero', `BLC-${year}-%`)
+        .eq('user_id', user?.id);
+      let maxNum = 0;
+      for (const b of existing || []) {
+        const match = b.numero?.match(new RegExp(`^BLC-${year}-(\\d+)$`));
+        if (match) { const n = parseInt(match[1], 10); if (n > maxNum) maxNum = n; }
+      }
+      const candidate = `BLC-${year}-${String(maxNum + 1).padStart(4, '0')}`;
+      const { data: dup } = await supabase
+        .from('bons_livraison_client')
+        .select('id')
+        .eq('numero', candidate)
+        .eq('user_id', user?.id)
+        .maybeSingle();
+      if (!dup) { numeroBlc = candidate; break; }
+      attempts++;
+    }
+
+    const headerPayload = {
+      user_id: user?.id,
+      numero: numeroBlc,
+      facture_id: factureId,
+      client_id: factureHeader.client_id,
+      date_livraison: new Date().toISOString(),
+      statut: 'en_attente',
+      montant_ht: factureHeader.montant_ht,
+      montant_tva: factureHeader.montant_tva,
+      montant_ttc: factureHeader.montant_ttc,
+      notes: `Bon de livraison généré pour la facture ${factureHeader.numero}`,
+    };
+
+    let { data: blcData, error: blcError } = await supabase
+      .from('bons_livraison_client')
+      .insert([headerPayload])
+      .select()
+      .single();
+
+    if (blcError?.message?.includes('duplicate key') || blcError?.code === '23505') {
+      numeroBlc = await (async () => {
+        const { data: all } = await supabase
+          .from('bons_livraison_client')
+          .select('numero')
+          .like('numero', `BLC-${year}-%`)
+          .eq('user_id', user?.id);
+        let mn = 0;
+        for (const b of all || []) {
+          const m = b.numero?.match(new RegExp(`^BLC-${year}-(\\d+)$`));
+          if (m) { const n = parseInt(m[1], 10); if (n > mn) mn = n; }
+        }
+        return `BLC-${year}-${String(mn + 1).padStart(4, '0')}`;
+      })();
+      const retry = await supabase
+        .from('bons_livraison_client')
+        .insert([{ ...headerPayload, numero: numeroBlc }])
+        .select()
+        .single();
+      blcData = retry.data;
+      blcError = retry.error;
+    }
+    if (blcError) throw blcError;
+
+    if (factureLignes && factureLignes.length > 0) {
+      const lignesPayload = factureLignes.map((l: any, index: number) => ({
+        bon_livraison_client_id: blcData.id,
+        produit_id: l.produit_id,
+        reference: l.reference || '',
+        designation: l.designation || '',
+        quantite: Number(l.quantite || 0),
+        prix_unitaire_ht: Number(l.prix_unitaire_ht || 0),
+        tva: Number(l.tva ?? 20),
+        remise: Number(l.remise || 0),
+        prix_vente_ttc: Number(l.prix_vente_ttc || 0),
+        montant_ht: Number(l.montant_ht || 0),
+        montant_ttc: Number(l.montant_ttc || 0),
+        ordre: index,
+      }));
+      const { error: lignesError } = await supabase
+        .from('bon_livraison_client_lignes')
+        .insert(lignesPayload);
+      if (lignesError) throw lignesError;
+    }
+  }
+
   const onSubmit = async (data: FactureFormValues) => {
     setIsLoading(true);
     try {
@@ -260,6 +371,15 @@ export function FactureForm({ initialData, onSuccess }: FactureFormProps) {
           }
         }
         await ensureLowStockNotifications(user?.id, changedIds);
+
+        // Auto-create a linked Bon de Livraison Client for factures that are
+        // active (payée / reste_a_payer). De-duplicated by facture_id so it is
+        // a no-op if one already exists (e.g. on edit). Never touches stock.
+        try {
+          await createBLClientForFacture(Number(factureId), payload, lignesPayload);
+        } catch (blcError) {
+          console.error('Error auto-creating BL client:', blcError);
+        }
       }
 
       toast.success(initialData ? 'Facture modifiée' : 'Facture créée');

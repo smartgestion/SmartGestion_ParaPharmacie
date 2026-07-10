@@ -270,6 +270,7 @@
     "delivery_notes": "Bons de Livraison",
     "delivery_notes_client": "Bons de Livraison",
     "purchase_orders": "Bons de Commande",
+    "remises": "Remises",
     "expenses": "Dépenses",
     "supplier_credit_notes": "Avoirs Fournisseur",
     "clients": "Clients",
@@ -321,6 +322,7 @@
       "delivery_notes": "Suivi des livraisons",
       "delivery_notes_client": "Bons de livraison clients",
       "purchase_orders": "Gestion des commandes",
+      "remises": "Remises des bons de commande",
       "expenses": "Suivi des dépenses",
       "supplier_credit_notes": "Avoirs & retours fournisseur",
       "clients": "Gestion du portefeuille client",
@@ -971,7 +973,13 @@
     "confirm_cancel_title":   "Confirmer l'annulation",
     "confirm_cancel_body":    "Une fois annulé, ce bon de commande ne pourra plus être changé vers un autre statut. Voulez-vous continuer ?",
     "confirm_button":         "Confirmer",
-    "cancel_button":          "Annuler"
+    "cancel_button":          "Annuler",
+    "form_bl_fournisseur_label": "N° BL Fournisseur",
+    "form_bl_fournisseur_ph":    "N° du bon de livraison du fournisseur",
+    "form_motif_annulation_label": "Motif d'annulation",
+    "form_motif_annulation_ph":    "Raison de l'annulation de ce bon de commande...",
+    "form_locked_delivered_hint":  "Bon de commande livré : seul le N° BL Fournisseur reste modifiable.",
+    "form_locked_cancelled_hint":  "Bon de commande annulé : seuls le N° BL Fournisseur et le motif d'annulation restent modifiables."
   },
   "bons_livraison": {
     "page_title":      "Bons de Livraison",
@@ -1320,6 +1328,26 @@
     "col_price_ttc":   "Prix TTC",
     "col_stock":       "Stock",
     "col_actions":     "Actions"
+  },
+  "remises": {
+    "page_title":      "Remises",
+    "page_subtitle":   "Consultez les remises définies dans les bons de commande",
+    "search_ph":       "Rechercher par produit, code-barres, fournisseur...",
+    "loading":         "Chargement des remises...",
+    "empty_filtered":  "Aucun résultat trouvé",
+    "empty_all":       "Aucun produit enregistré",
+    "toast_load_error":"Erreur",
+    "sidebar_title":   "Aperçu des Remises",
+    "sidebar_total_products": "Total produits",
+    "sidebar_with_remise":    "Lignes avec remise",
+    "sidebar_avg_remise":     "Remise moyenne",
+    "sidebar_no_bc":          "Produits sans BC",
+    "col_product":     "Produit",
+    "col_supplier":    "Fournisseur",
+    "col_qty_bc":      "Qté BC",
+    "col_stock":       "Quantité restante",
+    "col_buy_price":   "Prix Achat TTC",
+    "col_remise":      "Remise"
   },
   "transactions": {
     "page_title":      "Transactions",

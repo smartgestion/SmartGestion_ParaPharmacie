@@ -81,6 +81,10 @@ export const BonCommandeDocument = forwardRef<HTMLDivElement, BonCommandeDocumen
     const totalTtc = pickNum(bon, 'montantTtc', 'montant_ttc')
     const dateEmission = fmtDate(pickVal(bon, 'dateEmission', 'dateCommande', 'date', 'date_emission'))
     const numero = bon.numero || '-'
+    const blFournisseur = pickVal(bon, 'blFournisseur', 'bl_fournisseur')
+    const statut = pickVal(bon, 'statut')
+    const isCancelled = statut === 'annulé' || statut === 'annulée'
+    const motifAnnulation = pickVal(bon, 'motifAnnulation', 'motif_annulation')
     const entity = pickVal(bon, 'fournisseur', 'client') || {}
     const entityName = entity?.nomSociete || entity?.nom || '-'
 
@@ -194,6 +198,11 @@ export const BonCommandeDocument = forwardRef<HTMLDivElement, BonCommandeDocumen
                     <strong style={{ color: C.title }}>Date:</strong> {dateEmission}
                   </span>
                 </div>
+                {blFournisseur && (
+                  <div style={{ fontSize: '9pt', marginTop: 4, color: C.text }}>
+                    <strong style={{ color: C.title }}>N° BL Fournisseur:</strong> {blFournisseur}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -314,6 +323,13 @@ export const BonCommandeDocument = forwardRef<HTMLDivElement, BonCommandeDocumen
               {bon.notes && (
                 <div style={{ marginTop: 14, fontSize: '9pt', color: C.text }}>
                   <strong style={{ color: C.title }}>Notes:</strong> {bon.notes}
+                </div>
+              )}
+
+              {/* Motif d'annulation — only for cancelled orders */}
+              {isCancelled && motifAnnulation && (
+                <div style={{ marginTop: 10, fontSize: '9pt', color: C.text }}>
+                  <strong style={{ color: C.title }}>Motif d'annulation:</strong> {motifAnnulation}
                 </div>
               )}
 

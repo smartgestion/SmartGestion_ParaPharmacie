@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { Plus, Trash2, Calculator } from 'lucide-react'
+import { Plus, Trash2, Calculator, Lock } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -35,6 +35,17 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
   // forced to "brouillon" (the default value) and the status dropdown is
   // hidden during creation.
   const isEditing = !!initialData?.id;
+  // Edit-locking based on the validated status of the document being edited.
+  //  - "livré"/"livrée": everything is read-only EXCEPT N° BL Fournisseur.
+  //  - "annulé": everything is read-only EXCEPT N° BL Fournisseur and the
+  //    cancellation reason (Motif d'annulation).
+  // In every other status the form is fully editable (unchanged behavior).
+  const initialStatut: string = initialData?.statut || '';
+  const isDelivered = initialStatut === 'livré' || initialStatut === 'livrée';
+  const isCancelled = initialStatut === 'annulé' || initialStatut === 'annulée';
+  // When true, all "core" fields (supplier, dates, status, lines, notes,
+  // totals) are frozen. Only the always-editable fields below stay open.
+  const locked = isDelivered || isCancelled;
   const [fournisseurs, setFournisseurs] = useState<any[]>([]);
   const [produits, setProduits] = useState<any[]>([]);
   const [parametres, setParametres] = useState<any>(null);
@@ -63,6 +74,8 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
     statut: z.string().optional(),
     modePaiement: z.string().optional(),
     notes: z.string().optional(),
+    blFournisseur: z.string().optional(),
+    motifAnnulation: z.string().optional(),
     lignes: z.array(ligneSchema).min(1, t('shared.validation.lines_min')),
   });
 
@@ -77,6 +90,8 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
       statut: 'brouillon',
       modePaiement: 'Virement',
       notes: '',
+      blFournisseur: '',
+      motifAnnulation: '',
       lignes: [
         {
           designation: '',
@@ -114,6 +129,8 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
             fournisseurId: initialData.fournisseurId?.toString() || '',
             dateEmission: initialData.dateCommande ? new Date(initialData.dateCommande).toISOString().split('T')[0] : '',
             dateLivraisonPrevue: initialData.dateLivraisonPrevue ? new Date(initialData.dateLivraisonPrevue).toISOString().split('T')[0] : '',
+            blFournisseur: initialData.blFournisseur ?? initialData.bl_fournisseur ?? '',
+            motifAnnulation: initialData.motifAnnulation ?? initialData.motif_annulation ?? '',
             lignes: initialData.lignes?.map((l: any) => ({
               ...l,
               produitId: l.produitId?.toString() || '',
@@ -218,6 +235,11 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
         montant_ht: Number(totals.ht),
         montant_tva: Number(totals.tva),
         montant_ttc: Number(totals.ttc),
+        bl_fournisseur: data.blFournisseur?.trim() ? data.blFournisseur.trim() : null,
+        // Only persist a cancellation reason for cancelled orders.
+        motif_annulation: (data.statut === 'annulé' || data.statut === 'annulée')
+          ? (data.motifAnnulation?.trim() ? data.motifAnnulation.trim() : null)
+          : null,
         numero: numero || initialData?.numero,
       };
 
@@ -389,6 +411,16 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
 
   return (
     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+      {locked && (
+        <div className="flex items-start gap-2 rounded-[6px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-300 dark:rounded-sm">
+          <Lock className="h-4 w-4 mt-0.5 shrink-0" />
+          <span>
+            {isCancelled
+              ? t('bons_commande.form_locked_cancelled_hint')
+              : t('bons_commande.form_locked_delivered_hint')}
+          </span>
+        </div>
+      )}
       <div className="bg-slate-50 p-4 rounded-lg border border-slate-200 dark:bg-slate-900/60 dark:border-white/10 dark:rounded-sm">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="space-y-2">
@@ -396,8 +428,9 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
             <Select
               value={form.watch('fournisseurId') || ""}
               onValueChange={(val) => form.setValue('fournisseurId', val)}
+              disabled={locked}
             >
-              <SelectTrigger className="bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white [&_.lucide-chevron-down]:dark:text-slate-500">
+              <SelectTrigger className="bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white [&_.lucide-chevron-down]:dark:text-slate-500 disabled:opacity-60 disabled:cursor-not-allowed">
                 <SelectValue placeholder={t('shared.form.select_supplier')} />
               </SelectTrigger>
               <SelectContent>
@@ -415,7 +448,7 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
 
           <div className="space-y-2">
             <Label className="text-slate-700 font-semibold dark:text-slate-300">{t('shared.form.emission_date')}</Label>
-            <Input type="date" className="bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white dark:[color-scheme:dark]" {...form.register('dateEmission')} />
+            <Input type="date" disabled={locked} className="bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white dark:[color-scheme:dark] disabled:opacity-60 disabled:cursor-not-allowed" {...form.register('dateEmission')} />
             {form.formState.errors.dateEmission && (
               <p className="text-xs text-red-500 font-medium">{form.formState.errors.dateEmission.message}</p>
             )}
@@ -423,7 +456,7 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
 
           <div className="space-y-2">
             <Label className="text-slate-700 font-semibold dark:text-slate-300">{t('shared.form.planned_delivery')}</Label>
-            <Input type="date" className="bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white dark:[color-scheme:dark]" {...form.register('dateLivraisonPrevue')} />
+            <Input type="date" disabled={locked} className="bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white dark:[color-scheme:dark] disabled:opacity-60 disabled:cursor-not-allowed" {...form.register('dateLivraisonPrevue')} />
           </div>
 
           {isEditing && (
@@ -432,8 +465,9 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
               <Select
                 value={form.watch('statut') || ""}
                 onValueChange={(val) => form.setValue('statut', val)}
+                disabled={locked}
               >
-                <SelectTrigger className="bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white [&_.lucide-chevron-down]:dark:text-slate-500">
+                <SelectTrigger className="bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white [&_.lucide-chevron-down]:dark:text-slate-500 disabled:opacity-60 disabled:cursor-not-allowed">
                   <SelectValue placeholder={t('shared.form.select_status')} />
                 </SelectTrigger>
                 <SelectContent>
@@ -446,6 +480,31 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
               </Select>
             </div>
           )}
+
+          {/* N° BL Fournisseur — ALWAYS editable, even for locked
+              (livré / annulé) purchase orders. */}
+          <div className="space-y-2">
+            <Label className="text-slate-700 font-semibold dark:text-slate-300">{t('bons_commande.form_bl_fournisseur_label')}</Label>
+            <Input
+              type="text"
+              placeholder={t('bons_commande.form_bl_fournisseur_ph')}
+              className="bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white"
+              {...form.register('blFournisseur')}
+            />
+          </div>
+
+          {/* Motif d'annulation — only visible when the order is cancelled;
+              editable so the user can add / update the reason. */}
+          {isCancelled && (
+            <div className="space-y-2 md:col-span-3">
+              <Label className="text-slate-700 font-semibold dark:text-slate-300">{t('bons_commande.form_motif_annulation_label')}</Label>
+              <Textarea
+                placeholder={t('bons_commande.form_motif_annulation_ph')}
+                className="min-h-[80px] bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white"
+                {...form.register('motifAnnulation')}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -456,7 +515,8 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
             type="button"
             variant="outline"
             size="sm"
-            className="border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-400 dark:hover:bg-orange-500/10"
+            disabled={locked}
+            className="border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-400 dark:hover:bg-orange-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() =>
               append({ designation: '', quantite: 1, prixUnitaireHt: 0, tva: 20 })
             }
@@ -494,6 +554,7 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
                     <td className="p-2 min-w-[220px]">
                       <ProductSearchBar
                         compact
+                        disabled={locked}
                         produits={produits}
                         priceField="achat"
                         accent="orange"
@@ -503,7 +564,8 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
                     </td>
                     <td className="p-2">
                       <Input
-                        className="h-9 bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white"
+                        disabled={locked}
+                        className="h-9 bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                         {...form.register(`lignes.${index}.designation`)}
                       />
                     </td>
@@ -511,7 +573,8 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
                       <Input
                         type="number"
                         step="0.01"
-                        className="h-9 text-right bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white"
+                        disabled={locked}
+                        className="h-9 text-right bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                         {...form.register(`lignes.${index}.quantite`, { valueAsNumber: true })}
                       />
                     </td>
@@ -519,7 +582,8 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
                       <Input
                         type="number"
                         step="0.01"
-                        className="h-9 text-right bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white"
+                        disabled={locked}
+                        className="h-9 text-right bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                         {...form.register(`lignes.${index}.prixUnitaireHt`, { valueAsNumber: true })}
                       />
                     </td>
@@ -527,7 +591,8 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
                       <Input
                         type="number"
                         step="0.01"
-                        className="h-9 text-right bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white"
+                        disabled={locked}
+                        className="h-9 text-right bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                         {...form.register(`lignes.${index}.tva`, { valueAsNumber: true })}
                       />
                     </td>
@@ -542,7 +607,7 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
                           size="icon"
                           className="h-8 w-8 text-orange-500 hover:text-orange-700 hover:bg-orange-50 dark:text-orange-400 dark:hover:text-orange-300 dark:hover:bg-white/5"
                           onClick={() => setCalcRowIndex(index)}
-                          disabled={!form.watch(`lignes.${index}.produitId`)}
+                          disabled={locked || !form.watch(`lignes.${index}.produitId`)}
                           title={t('shared.form.price_calculator', 'Calculateur de prix')}
                         >
                           <Calculator className="h-4 w-4" />
@@ -553,7 +618,7 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
                           size="icon"
                           className="h-8 w-8 text-red-400 hover:text-red-600 hover:bg-red-50 dark:text-rose-500/70 dark:hover:text-rose-500 dark:hover:bg-white/5"
                           onClick={() => remove(index)}
-                          disabled={fields.length === 1}
+                          disabled={locked || fields.length === 1}
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -574,8 +639,9 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
             <Label className="text-slate-700 font-semibold dark:text-slate-300">{t('shared.form.notes')}</Label>
             <Textarea 
               {...form.register('notes')} 
+              disabled={locked}
               placeholder={t('bons_commande.form_notes_ph')} 
-              className="min-h-[100px] bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white"
+              className="min-h-[100px] bg-white border-slate-300 dark:bg-slate-950/50 dark:border-white/10 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
             />
           </div>
         </div>

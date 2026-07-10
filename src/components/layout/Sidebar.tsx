@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { 
   Sparkles, Stethoscope, LayoutDashboard, FileText, ShoppingCart, Package, 
   Users, Building2, Settings, ChevronLeft, ChevronRight, LogOut,
-  X, Receipt, ClipboardList, Truck, DollarSign, FileCheck, FolderArchive
+  X, Receipt, ClipboardList, Truck, DollarSign, FileCheck, FolderArchive, Percent
 } from 'lucide-react';
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -36,6 +36,7 @@ const navigationGroups = [
     titleKey: 'nav.achats',
     items: [
       { nameKey: 'navigation.purchase_orders', href: '/bons-commande', icon: ClipboardList },
+      { nameKey: 'navigation.remises', href: '/remises', icon: Percent },
       { nameKey: 'navigation.expenses', href: '/depenses', icon: DollarSign },
       { nameKey: 'navigation.supplier_credit_notes', href: '/avoirs-fournisseur', icon: Receipt },
     ]
@@ -158,10 +159,10 @@ export function Sidebar({ isCollapsed, onToggle, isMobileOpen, onMobileClose }: 
         )}>
           <div className="flex items-center justify-center gap-3 w-full">
             {isCollapsed ? (
-              <span className="text-xl font-black text-white">S<span className="text-emerald-400">G</span></span>
+              <span className="text-xl font-black text-white">S<span className="text-blue-400">G</span></span>
             ) : (
               <div className="flex flex-col items-center text-center leading-none animate-in fade-in slide-in-from-left-2 duration-300">
-                <span className="text-xl font-black text-white">Smart<span className="text-emerald-400">Gestion</span></span>
+                <span className="text-xl font-black text-white">Smart<span className="text-blue-400">Gestion</span></span>
                 <span className="text-[9px] text-slate-500 font-semibold uppercase tracking-widest mt-1">{t('app.tagline')}</span>
               </div>
             )}

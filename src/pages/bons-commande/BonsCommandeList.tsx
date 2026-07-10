@@ -46,6 +46,8 @@ interface BonCommande {
   montantTva: number;
   montantTtc: number;
   statut: string;
+  blFournisseur?: string;
+  motifAnnulation?: string;
   lignes?: any[];
 }
 
@@ -119,6 +121,8 @@ export function BonsCommandeList() {
     montantTva: Number(b.montant_tva || 0),
     montantTtc: Number(b.montant_ttc || 0),
     statut: b.statut || 'brouillon',
+    blFournisseur: b.bl_fournisseur ?? '',
+    motifAnnulation: b.motif_annulation ?? '',
   });
 
   const fetchBons = async () => {
@@ -226,6 +230,9 @@ export function BonsCommandeList() {
         fournisseurId: bonData.fournisseur_id?.toString() || '',
         dateCommande: bonData.date_commande?.split('T')[0] || '',
         dateLivraisonPrevue: bonData.date_livraison_prevue?.split('T')[0] || '',
+        statut: bonData.statut || 'brouillon',
+        blFournisseur: bonData.bl_fournisseur ?? '',
+        motifAnnulation: bonData.motif_annulation ?? '',
         lignes: (lignesData || []).map((l: any) => ({
           produitId: l.produit_id?.toString() || '',
           designation: l.designation || '',
@@ -276,6 +283,10 @@ export function BonsCommandeList() {
         montantTva: bonData.montant_tva,
         montantTtc: bonData.montant_ttc,
         statut: bonData.statut,
+        blFournisseur: bonData.bl_fournisseur ?? '',
+        bl_fournisseur: bonData.bl_fournisseur ?? '',
+        motifAnnulation: bonData.motif_annulation ?? '',
+        motif_annulation: bonData.motif_annulation ?? '',
         lignes: (lignesData || []).map((l: any) => ({
           designation: l.designation || '',
           reference: l.reference || '',
@@ -1075,17 +1086,15 @@ export function BonsCommandeList() {
                             >
                               <Download className="h-4 w-4" />
                             </Button>
-                            {bon.statut === 'brouillon' && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-[4px] dark:hover:text-white dark:hover:bg-white/5 dark:rounded-sm"
-                                onClick={() => handleEdit(bon)}
-                                title={t('shared.actions.edit')}
-                              >
-                                <FileEdit className="h-4 w-4" />
-                              </Button>
-                            )}
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-[4px] dark:hover:text-white dark:hover:bg-white/5 dark:rounded-sm"
+                              onClick={() => handleEdit(bon)}
+                              title={t('shared.actions.edit')}
+                            >
+                              <FileEdit className="h-4 w-4" />
+                            </Button>
                             {bon.statut === 'brouillon' ? (
                               <Button
                                 variant="ghost"

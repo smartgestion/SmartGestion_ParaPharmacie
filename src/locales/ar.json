@@ -270,6 +270,7 @@
     "delivery_notes": "إيصالات التسليم",
     "delivery_notes_client": "إيصالات التسليم",
     "purchase_orders": "أوامر الشراء",
+    "remises": "الخصومات",
     "expenses": "المصروفات",
     "supplier_credit_notes": "إشعارات دائن المورد",
     "clients": "العملاء",
@@ -321,6 +322,7 @@
       "delivery_notes": "متابعة التسليم",
       "delivery_notes_client": "إيصالات تسليم العملاء",
       "purchase_orders": "إدارة أوامر الشراء",
+      "remises": "خصومات أوامر الشراء",
       "expenses": "متابعة المصروفات",
       "supplier_credit_notes": "إشعارات دائن المورد والمرتجعات",
       "clients": "إدارة محفظة العملاء",
@@ -971,7 +973,13 @@
     "confirm_cancel_title":   "تأكيد الإلغاء",
     "confirm_cancel_body":    "بمجرد الإلغاء، لا يمكن تغيير سند الطلب هذا إلى حالة أخرى. هل تريد المتابعة؟",
     "confirm_button":         "تأكيد",
-    "cancel_button":          "إلغاء"
+    "cancel_button":          "إلغاء",
+    "form_bl_fournisseur_label": "رقم سند تسليم المورد",
+    "form_bl_fournisseur_ph":    "رقم سند تسليم المورد",
+    "form_motif_annulation_label": "سبب الإلغاء",
+    "form_motif_annulation_ph":    "سبب إلغاء سند الطلب هذا...",
+    "form_locked_delivered_hint":  "سند طلب مُسلّم: يمكن تعديل رقم سند تسليم المورد فقط.",
+    "form_locked_cancelled_hint":  "سند طلب مُلغى: يمكن تعديل رقم سند تسليم المورد وسبب الإلغاء فقط."
   },
   "bons_livraison": {
     "page_title":      "وثائق التسليم",
@@ -1320,6 +1328,26 @@
     "col_price_ttc":   "السعر (ش.ض)",
     "col_stock":       "المخزون",
     "col_actions":     "الإجراءات"
+  },
+  "remises": {
+    "page_title":      "الخصومات",
+    "page_subtitle":   "عرض الخصومات المحددة في أوامر الشراء",
+    "search_ph":       "بحث بالمنتج أو الباركود أو المورد...",
+    "loading":         "جارٍ تحميل الخصومات...",
+    "empty_filtered":  "لا توجد نتائج مطابقة",
+    "empty_all":       "لم يتم تسجيل أي منتج",
+    "toast_load_error":"خطأ",
+    "sidebar_title":   "نظرة عامة على الخصومات",
+    "sidebar_total_products": "إجمالي المنتجات",
+    "sidebar_with_remise":    "أسطر بخصم",
+    "sidebar_avg_remise":     "متوسط الخصم",
+    "sidebar_no_bc":          "منتجات بدون أمر شراء",
+    "col_product":     "المنتج",
+    "col_supplier":    "المورد",
+    "col_qty_bc":      "كمية أمر الشراء",
+    "col_stock":       "الكمية المتبقية",
+    "col_buy_price":   "سعر الشراء (ش.ض)",
+    "col_remise":      "الخصم"
   },
   "transactions": {
     "page_title":      "المعاملات",

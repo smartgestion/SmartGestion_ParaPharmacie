@@ -1,7 +1,7 @@
 //! Local SQLite database manager for SmartGestion.
 //!
 //! The database file lives in the per-user local app-data directory
-//! (e.g. on Windows: `%LOCALAPPDATA%\com.SmartGestion.desktop\SmartGestion.db`).
+//! (e.g. on Windows: `%LOCALAPPDATA%\com.paragestion.desktop\paragestion.db`).
 //! It is created automatically on first launch and migrated to the current
 //! schema version. The single shared connection is wrapped in a
 //! `parking_lot::Mutex` and registered as Tauri state so IPC commands can
@@ -80,7 +80,7 @@ fn resolve_db_path(app: &AppHandle) -> DbResult<PathBuf> {
         std::fs::create_dir_all(&dir)?;
     }
 
-    dir.push("SmartGestion.db");
+    dir.push("paragestion.db");
     Ok(dir)
 }
 

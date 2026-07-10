@@ -18,6 +18,7 @@ import { AvoirsList } from './pages/avoirs/AvoirsList'
 import { AvoirsFournisseurList } from './pages/avoirs-fournisseur/AvoirsFournisseurList'
 import { DevisList } from './pages/devis/DevisList'
 import { BonsCommandeList } from './pages/bons-commande/BonsCommandeList'
+import { RemisesList } from './pages/remises/RemisesList'
 import { BonsLivraisonList } from './pages/bons-livraison/BonsLivraisonList'
 import { BonsLivraisonClientList } from './pages/bons-livraison-client/BonsLivraisonClientList'
 import { DepensesList } from './pages/depenses/DepensesList'
@@ -87,6 +88,7 @@ export default function App() {
               <Route path="avoirs" element={<AvoirsList />} />
               <Route path="devis" element={<DevisList />} />
               <Route path="bons-commande" element={<BonsCommandeList />} />
+              <Route path="remises" element={<RemisesList />} />
               <Route path="bons-livraison" element={<BonsLivraisonList />} />
               <Route path="bons-livraison-client" element={<BonsLivraisonClientList />} />
               <Route path="depenses" element={<DepensesList />} />

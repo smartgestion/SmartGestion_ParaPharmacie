@@ -250,6 +250,8 @@ pub const MIGRATIONS: &[&str] = &[
         montant_tva           REAL    DEFAULT 0,
         montant_ttc           REAL    DEFAULT 0,
         notes                 TEXT,
+        bl_fournisseur        TEXT,
+        motif_annulation      TEXT,
         created_at            TEXT    DEFAULT CURRENT_TIMESTAMP,
         updated_at            TEXT    DEFAULT CURRENT_TIMESTAMP,
         stock_updated         INTEGER DEFAULT 0,
@@ -712,6 +714,8 @@ pub const ADDITIVE_COLUMNS: &[&str] = &[
     "ALTER TABLE devis_lignes ADD COLUMN prix_vente_ttc REAL DEFAULT 0;",
     "ALTER TABLE bon_livraison_client_lignes ADD COLUMN remise REAL DEFAULT 0;",
     "ALTER TABLE bon_livraison_client_lignes ADD COLUMN prix_vente_ttc REAL DEFAULT 0;",
+    "ALTER TABLE bons_commande ADD COLUMN bl_fournisseur TEXT;",
+    "ALTER TABLE bons_commande ADD COLUMN motif_annulation TEXT;",
 ];
 
 /// Current schema version (bump when adding migrations).
