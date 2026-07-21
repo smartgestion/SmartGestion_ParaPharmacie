@@ -4,7 +4,8 @@ import { useAuth } from '@/contexts/AuthContext'
 import { 
   Sparkles, Stethoscope, LayoutDashboard, FileText, ShoppingCart, Package, 
   Users, Building2, Settings, ChevronLeft, ChevronRight, LogOut,
-  X, Receipt, ClipboardList, Truck, DollarSign, FileCheck, FolderArchive, Percent
+  X, Receipt, ClipboardList, Truck, DollarSign, FileCheck, FolderArchive, Percent,
+  BarChart3
 } from 'lucide-react';
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -18,6 +19,7 @@ const navigationGroups = [
     items: [
       { nameKey: 'navigation.workspace', href: '/', icon: Sparkles },
       { nameKey: 'navigation.dashboard', href: '/dashboard', icon: LayoutDashboard },
+      { nameKey: 'navigation.reports', href: '/reports', icon: BarChart3 },
     ]
   },
   {
