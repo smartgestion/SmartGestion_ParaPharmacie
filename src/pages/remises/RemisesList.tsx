@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import {
   Search, Percent, ChevronLeft, ChevronRight, Package,
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, htToTtc } from '@/lib/utils'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -56,6 +56,11 @@ interface RemiseRow {
    * otherwise the product's own `prix_achat_ttc` (remise already applied).
    */
   prixAchatTtc: number | null;
+  /**
+   * Sale price TTC — always the product's own selling price incl. tax
+   * (prix_vente_ttc, or derived from prix_vente_ht via the VAT rate).
+   */
+  prixVenteTtc: number | null;
   /**
    * Remise (%) — from the BC line when the product has a BC, otherwise
    * the product's own `calc_remise` (defined when the product was added).
@@ -137,6 +142,11 @@ export function RemisesList() {
       // on the product itself (prix_achat_ttc / calc_remise).
       const out: RemiseRow[] = [];
       for (const p of produits || []) {
+        // Sale price TTC always comes from the product itself: prefer the
+        // stored TTC, otherwise derive it from the HT sale price + VAT rate.
+        const produitVenteTtc = Number(p.prix_vente_ttc || 0) > 0
+          ? Number(p.prix_vente_ttc)
+          : htToTtc(Number(p.prix_vente_ht || 0), Number(p.taux_tva ?? p.tva ?? 20));
         const base = {
           produitId: Number(p.id),
           produitNom: p.designation || p.nom || '',
@@ -144,6 +154,7 @@ export function RemisesList() {
           barcode: p.barcode || '',
           stockActuel: Number(p.stock_actuel || 0),
           unite: p.unite || '',
+          prixVenteTtc: produitVenteTtc > 0 ? produitVenteTtc : null,
         };
         const produitLignes = lignesByProduit.get(Number(p.id)) || [];
         if (produitLignes.length === 0) {
@@ -277,13 +288,14 @@ export function RemisesList() {
                     <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 text-right dark:text-slate-400">{t('remises.col_qty_bc')}</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 text-right dark:text-slate-400">{t('remises.col_stock')}</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 dark:text-slate-400">{t('remises.col_buy_price')}</TableHead>
+                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 dark:text-slate-400">{t('remises.col_sale_price_ttc')}</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 text-right dark:text-slate-400">{t('remises.col_remise')}</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-48 text-center">
+                      <TableCell colSpan={7} className="h-48 text-center">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <div className="h-8 w-8 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
                           <p className="text-sm text-muted-foreground font-medium">{t('remises.loading')}</p>
@@ -292,7 +304,7 @@ export function RemisesList() {
                     </TableRow>
                   ) : paginatedRows.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="h-48 text-center">
+                      <TableCell colSpan={7} className="h-48 text-center">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <div className="bg-slate-50 rounded-[6px] p-4 border border-slate-100 dark:bg-[#0F172A]/40 dark:border-white/10">
                             <Percent className="h-8 w-8 text-slate-300 dark:text-slate-600" />
@@ -351,6 +363,13 @@ export function RemisesList() {
                           {row.prixAchatTtc !== null ? (
                             <span className="text-sm text-slate-600 dark:text-slate-400" dir="ltr">
                               {formatCurrency(row.prixAchatTtc)}
+                            </span>
+                          ) : emptyCell}
+                        </TableCell>
+                        <TableCell className="px-4 py-4">
+                          {row.prixVenteTtc !== null ? (
+                            <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400" dir="ltr">
+                              {formatCurrency(row.prixVenteTtc)}
                             </span>
                           ) : emptyCell}
                         </TableCell>

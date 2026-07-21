@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
-import { formatCurrencyLocale, cn } from '@/lib/utils'
+import { formatCurrencyLocale, formatAmount, cn } from '@/lib/utils'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -23,6 +23,7 @@ import {
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { KPICard } from '@/components/ui/kpi-card'
+import { ProductAnalytics } from '@/components/dashboard/ProductAnalytics'
 import { ProductSalesFilter } from '@/components/dashboard/ProductSalesFilter'
 import { useTranslation } from 'react-i18next'
 
@@ -51,7 +52,7 @@ interface Stats {
   cogsTTCSold: number
   cogsHTReturned: number
   cogsTTCReturned: number
-  stockValueHT: number
+  stockValueTTC: number
   monthlyData: Array<{ name: string; revenue: number; expenses: number }>
   monthlyDataHT: Array<{ name: string; revenue: number; expenses: number }>
   lowStockProduits: any[]
@@ -176,7 +177,6 @@ export function Dashboard() {
 
   const [stats, setStats]     = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)
-  const [isTtcMode, setIsTtcMode] = useState(true)
   const [margeDetailsOpen, setMargeDetailsOpen] = useState(false)
   const [dateRange, setDateRange] = useState<DateRangeKey>('this_month')
   const [customStart, setCustomStart] = useState('')
@@ -438,7 +438,13 @@ export function Dashboard() {
           }
         }
 
-        const stockValueHT = produits.reduce((s, p: any) => s + (Number(p.stock_actuel || 0) * Number(p.prix_achat_ht || 0)), 0)
+        // Valeur du stock affichée en TTC (préférer le TTC stocké, sinon dérivé du HT)
+        const stockValueTTC = produits.reduce((s, p: any) => {
+          const achatTtc = Number(p.prix_achat_ttc || 0) > 0
+            ? Number(p.prix_achat_ttc)
+            : Number(p.prix_achat_ht || 0) * (1 + Number(p.taux_tva ?? 20) / 100)
+          return s + (Number(p.stock_actuel || 0) * achatTtc)
+        }, 0)
 
         setStats({
           clientsCount: clients.length,
@@ -451,7 +457,7 @@ export function Dashboard() {
           totalTvaCollectee, totalTvaDeductible, tvaNet,
           ventesHT, totalCOGS, totalCOGSTTC,
           cogsHTSold, cogsTTCSold, cogsHTReturned, cogsTTCReturned,
-          stockValueHT, monthlyData, monthlyDataHT,
+          stockValueTTC, monthlyData, monthlyDataHT,
           bonsCommandeCount: bonsCommande.filter((b: any) => ['livré', 'livrée'].includes(b.statut)).length,
           lowStockProduits: produits.filter((p: any) => Number(p.stock_actuel) <= Number(p.stock_min)).slice(0, 5),
           recentFactures: recentFacturesRaw,
@@ -561,7 +567,7 @@ export function Dashboard() {
             <p className="text-[10px] sm:text-xs text-muted-foreground">{td('header.stock_value_label')}</p>
             {/* dir=ltr keeps the number reading left→right even in Arabic */}
             <p className="text-base sm:text-lg font-bold text-foreground" dir="ltr">
-              {fmt(stats?.stockValueHT ?? 0)}
+              {fmt(stats?.stockValueTTC ?? 0)}
             </p>
           </div>
         </div>
@@ -645,35 +651,7 @@ export function Dashboard() {
         </div>
       </div>
 
-      {/* ── HT / TTC Toggle ────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-1 p-0.5 rounded-lg border border-input bg-background w-fit">
-        <button
-          type="button"
-          onClick={() => setIsTtcMode(false)}
-          className={cn(
-            'px-3 py-1 text-xs font-medium rounded-md transition-all',
-            !isTtcMode
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          HT
-        </button>
-        <button
-          type="button"
-          onClick={() => setIsTtcMode(true)}
-          className={cn(
-            'px-3 py-1 text-xs font-medium rounded-md transition-all',
-            isTtcMode
-              ? 'bg-primary text-primary-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          )}
-        >
-          TTC
-        </button>
-      </div>
-
-      {/* ── KPI Row 1: Financial KPIs ─────────────────────────────────────── */}
+      {/* ── KPI Row 1: Financial KPIs (tous les montants sont affichés TTC) ── */}
       {/* Mobile: 2 columns (full-width single-col makes huge cards waste
           vertical space). Tablet/desktop: 2-4 cols. */}
       <div className="grid gap-3 sm:gap-4 grid-cols-2 xl:grid-cols-5">
@@ -685,8 +663,8 @@ export function Dashboard() {
          * saturation of the dark-mode *-400 icons at parity contrast.
          */}
         <KPICard
-          title={isTtcMode ? td('kpi.revenue.title_ttc') : td('kpi.revenue.title_ht')}
-          value={fmt(isTtcMode ? (stats?.totalRevenue ?? 0) : (stats?.totalRevenueHT ?? 0))}
+          title={td('kpi.revenue.title_ttc')}
+          value={fmt(stats?.totalRevenue ?? 0)}
           subtitle={td('kpi.revenue.subtitle')}
           icon={DollarSign}
           iconContainerClass="bg-emerald-50 border border-emerald-200/60 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400"
@@ -699,27 +677,23 @@ export function Dashboard() {
           iconContainerClass="bg-blue-50 border border-blue-200/60 text-blue-600 dark:bg-blue-500/10 dark:border-blue-500/20 dark:text-blue-400"
         />
         <KPICard
-          title={isTtcMode ? td('kpi.expenses.title_ttc') : td('kpi.expenses.title_ht')}
-          value={fmt(isTtcMode ? (stats?.totalDepenses ?? 0) : (stats?.totalDepensesHT ?? 0))}
+          title={td('kpi.expenses.title_ttc')}
+          value={fmt(stats?.totalDepenses ?? 0)}
           subtitle={td('kpi.expenses.subtitle')}
           icon={Activity}
           iconContainerClass="bg-rose-50 border border-rose-200/60 text-rose-600 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400"
         />
         <KPICard
-          title={isTtcMode ? td('kpi.profit.title_ttc') : td('kpi.profit.title_ht')}
-          value={fmt(isTtcMode ? (stats?.profit ?? 0) : (stats?.profitHT ?? 0))}
+          title={td('kpi.profit.title_ttc')}
+          value={fmt(stats?.profit ?? 0)}
           subtitle={td('kpi.profit.subtitle')}
           icon={ShieldCheck}
           iconContainerClass="bg-rose-50 border border-rose-200/60 text-rose-600 dark:bg-rose-500/10 dark:border-rose-500/20 dark:text-rose-400"
         />
         <div className="relative">
           <KPICard
-            title={isTtcMode ? td('kpi.marge_commerciale.title_ttc') : td('kpi.marge_commerciale.title_ht')}
-            value={fmt(
-              isTtcMode
-                ? (stats?.totalRevenue ?? 0) - (stats?.totalCOGSTTC ?? 0)
-                : (stats?.totalRevenueHT ?? 0) - (stats?.totalCOGS ?? 0)
-            )}
+            title={td('kpi.marge_commerciale.title_ttc')}
+            value={fmt((stats?.totalRevenue ?? 0) - (stats?.totalCOGSTTC ?? 0))}
             subtitle={td('kpi.marge_commerciale.subtitle')}
             icon={TrendingUp}
             iconContainerClass="bg-violet-50 border border-violet-200/60 text-violet-600 dark:bg-violet-500/10 dark:border-violet-500/20 dark:text-violet-400"
@@ -795,7 +769,7 @@ export function Dashboard() {
                 <TrendingUp className="h-5 w-5 text-primary shrink-0" />
                 {td('chart.title')}
               </CardTitle>
-              <CardDescription>{td('chart.subtitle')} ({isTtcMode ? 'TTC' : 'HT'})</CardDescription>
+              <CardDescription>{td('chart.subtitle')} (TTC)</CardDescription>
             </div>
 
             {/* Legend — ms-auto pushes it to the logical end */}
@@ -829,7 +803,7 @@ export function Dashboard() {
             <div className="h-[240px] sm:h-[280px] lg:h-[320px] w-full" dir="ltr">
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart
-                  data={isTtcMode ? (stats?.monthlyData ?? []) : (stats?.monthlyDataHT ?? [])}
+                  data={stats?.monthlyData ?? []}
                   margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
                 >
                   <defs>
@@ -1109,7 +1083,7 @@ export function Dashboard() {
                 <div className="h-2 w-2 rounded-full bg-primary shrink-0" />
               </div>
               <p className="text-2xl font-black text-foreground" dir="ltr">
-                {Number(stats?.totalTvaCollectee ?? 0).toFixed(2)}{' '}
+                {formatAmount(stats?.totalTvaCollectee ?? 0)}{' '}
                 <span className="text-sm font-medium text-muted-foreground">{td('tva.currency_short')}</span>
               </p>
               {/* Progress bar always reads left→right */}
@@ -1127,7 +1101,7 @@ export function Dashboard() {
                 <div className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
               </div>
               <p className="text-2xl font-black text-foreground" dir="ltr">
-                {Number(stats?.totalTvaDeductible ?? 0).toFixed(2)}{' '}
+                {formatAmount(stats?.totalTvaDeductible ?? 0)}{' '}
                 <span className="text-sm font-medium text-muted-foreground">{td('tva.currency_short')}</span>
               </p>
               <div className="h-2 w-full bg-muted rounded-full overflow-hidden" dir="ltr">
@@ -1151,7 +1125,7 @@ export function Dashboard() {
                 </Badge>
               </div>
               <p className="text-2xl font-black text-foreground" dir="ltr">
-                {Number(stats?.tvaNet ?? 0).toFixed(2)}{' '}
+                {formatAmount(stats?.tvaNet ?? 0)}{' '}
                 <span className="text-sm font-medium text-muted-foreground">{td('tva.currency_short')}</span>
               </p>
               <div className="h-2 w-full bg-muted rounded-full overflow-hidden" dir="ltr">
@@ -1174,7 +1148,10 @@ export function Dashboard() {
         </CardContent>
       </Card>
 
-      {/* ── Product Sales Analytics (Filtre Produit) ──────────────────────── */}
+      {/* ── Product Sales Analytics (new comprehensive section) ───────────── */}
+      <ProductAnalytics />
+
+      {/* ── Product Sales Filter (per-line sales history) ─────────────────── */}
       <ProductSalesFilter />
 
       {/* ── Marge Commerciale — calculation breakdown ───────────────────── */}
@@ -1183,17 +1160,17 @@ export function Dashboard() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Calculator className="h-5 w-5 text-violet-600 dark:text-violet-400" />
-              {isTtcMode ? td('kpi.marge_commerciale.title_ttc') : td('kpi.marge_commerciale.title_ht')}
+              {td('kpi.marge_commerciale.title_ttc')}
             </DialogTitle>
             <DialogDescription>
-              {td('kpi.marge_commerciale.calc_subtitle')} ({isTtcMode ? 'TTC' : 'HT'})
+              {td('kpi.marge_commerciale.calc_subtitle')} (TTC)
             </DialogDescription>
           </DialogHeader>
 
           {(() => {
-            const revenue = isTtcMode ? (stats?.totalRevenue ?? 0) : (stats?.totalRevenueHT ?? 0)
-            const cogsSold = isTtcMode ? (stats?.cogsTTCSold ?? 0) : (stats?.cogsHTSold ?? 0)
-            const cogsReturned = isTtcMode ? (stats?.cogsTTCReturned ?? 0) : (stats?.cogsHTReturned ?? 0)
+            const revenue = stats?.totalRevenue ?? 0
+            const cogsSold = stats?.cogsTTCSold ?? 0
+            const cogsReturned = stats?.cogsTTCReturned ?? 0
             const netCogs = cogsSold - cogsReturned
             const marge = revenue - netCogs
             const Row = ({ label, value, op }: { label: string; value: string; op?: string }) => (

@@ -38,7 +38,7 @@ import { BonLivraisonForm } from '@/components/forms/BonLivraisonForm'
 import { useReactToPrint } from 'react-to-print'
 import { BonLivraisonDocument } from '@/components/documents/BonLivraisonDocument'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
-import { formatCurrency, formatCurrencyLocale } from '@/lib/utils'
+import { formatCurrency, formatCurrencyLocale, htToTtc } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
@@ -915,7 +915,7 @@ export function BonsLivraisonList() {
                         <TableRow key={i} className="border-b border-slate-100 last:border-0 dark:border-white/5">
                           <TableCell className="py-3 text-sm dark:text-white">{l.designation || 'Produit'}</TableCell>
                           <TableCell className="py-3 text-start text-sm font-medium dark:text-white" dir="ltr">{l.quantite}</TableCell>
-                          <TableCell className="py-3 text-start text-sm text-slate-500 dark:text-slate-400" dir="ltr">{formatCurrency(l.prix_unitaire_ht || 0)}</TableCell>
+                          <TableCell className="py-3 text-start text-sm text-slate-500 dark:text-slate-400" dir="ltr">{formatCurrency(htToTtc(l.prix_unitaire_ht || 0, Number(l.tva ?? 20)))}</TableCell>
                           <TableCell className="py-3 text-start text-sm font-bold dark:text-white" dir="ltr">{formatCurrency(l.montant_ttc || 0)}</TableCell>
                         </TableRow>
                       ))}

@@ -4,7 +4,8 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Plus, Trash2 } from 'lucide-react'
-import { formatCurrencyLocale } from '@/lib/utils'
+import { formatCurrencyLocale, htToTtc, ttcToHt } from '@/lib/utils'
+import { TtcPriceInput } from '@/components/ui/TtcPriceInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -302,8 +303,14 @@ export function BonLivraisonForm({ initialData, onSuccess }: BLFormProps) {
       form.setValue(`lignes.${index}.reference`, produit.reference || '');
       form.setValue(`lignes.${index}.designation`, produit.designation || produit.nom || '');
       form.setValue(`lignes.${index}.quantite`, 1);
-      form.setValue(`lignes.${index}.prixUnitaireHt`, Number(produit.prix_achat_ht || produit.prixAchatHt || 0));
-      form.setValue(`lignes.${index}.tva`, Number(produit.taux_tva || produit.tva || 20));
+      // Prix affiché en TTC : préférer le TTC catalogue (conversion exacte),
+      // sinon retomber sur le HT stocké. Le champ de formulaire reste HT.
+      const tva = Number(produit.taux_tva || produit.tva || 20);
+      const prixAchatTtcProd = Number(produit.prix_achat_ttc || produit.prixAchatTtc || 0);
+      form.setValue(`lignes.${index}.prixUnitaireHt`, prixAchatTtcProd > 0
+        ? ttcToHt(prixAchatTtcProd, tva)
+        : Number(produit.prix_achat_ht || produit.prixAchatHt || 0));
+      form.setValue(`lignes.${index}.tva`, tva);
     }
   };
 
@@ -387,16 +394,17 @@ export function BonLivraisonForm({ initialData, onSuccess }: BLFormProps) {
                 <th className="p-3 text-start font-semibold text-slate-600 dark:text-slate-400">{t('bons_livraison.detail_col_product')}</th>
                 <th className="p-3 text-start font-semibold text-slate-600 dark:text-slate-400">{t('shared.form.description_label')} *</th>
                 <th className="p-3 text-end font-semibold text-slate-600 dark:text-slate-400 w-24">{t('shared.form.qty_label')} *</th>
-                <th className="p-3 text-end font-semibold text-slate-600 dark:text-slate-400 w-32">{t('shared.form.price_ht_label')}</th>
+                <th className="p-3 text-end font-semibold text-slate-600 dark:text-slate-400 w-32">{t('shared.form.price_ttc_label')}</th>
                 <th className="p-3 text-end font-semibold text-slate-600 dark:text-slate-400 w-24">{t('shared.form.vat_pct_label')}</th>
-                <th className="p-3 text-end font-semibold text-slate-600 dark:text-slate-400 w-32">{t('shared.form.subtotal_ht')}</th>
+                <th className="p-3 text-end font-semibold text-slate-600 dark:text-slate-400 w-32">{t('shared.form.total_ttc')}</th>
                 <th className="p-3 w-12"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-white/5">
               {fields.map((field, index) => {
                 const ligne = watchLignes[index];
-                const totalHt = (ligne?.quantite || 0) * (ligne?.prixUnitaireHt || 0);
+                // Total de ligne affiché en TTC (le HT reste la source stockée)
+                const totalTtc = htToTtc((ligne?.quantite || 0) * (ligne?.prixUnitaireHt || 0), ligne?.tva ?? 20);
                 const selectedProductId = form.watch(`lignes.${index}.produitId`);
                 const selectedProduct = selectedProductId ? produits.find(p2 => p2.id.toString() === selectedProductId) : null;
 
@@ -427,11 +435,11 @@ export function BonLivraisonForm({ initialData, onSuccess }: BLFormProps) {
                       />
                     </td>
                     <td className="p-2">
-                      <Input
-                        type="number"
-                        step="0.01"
+                      <TtcPriceInput
                         className="h-9 text-end bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white"
-                        {...form.register(`lignes.${index}.prixUnitaireHt`, { valueAsNumber: true })}
+                        htValue={ligne?.prixUnitaireHt || 0}
+                        tvaRate={ligne?.tva ?? 20}
+                        onHtChange={(ht) => form.setValue(`lignes.${index}.prixUnitaireHt`, ht, { shouldValidate: true, shouldDirty: true })}
                       />
                     </td>
                     <td className="p-2">
@@ -446,7 +454,7 @@ export function BonLivraisonForm({ initialData, onSuccess }: BLFormProps) {
                       dir={i18n.language.startsWith('ar') ? 'rtl' : 'ltr'}
                       className="p-2 text-end font-semibold text-slate-700 align-middle dark:text-white"
                     >
-                      {formatCurrencyLocale(totalHt, i18n.language)}
+                      {formatCurrencyLocale(totalTtc, i18n.language)}
                     </td>
                     <td className="p-2 text-center align-middle">
                       <Button

@@ -4,7 +4,7 @@ import {
   ArrowLeft, Plus, Search, FileEdit, Trash2, Package, AlertTriangle,
   ChevronLeft, ChevronRight, ImageIcon
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, htToTtc } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -183,7 +183,11 @@ export function ProduitsList() {
 
   const produitsCount = produits.length;
   const lowStockCount = produits.filter(p => p.stockActuel <= p.stockMin).length;
-  const stockValue = produits.reduce((sum, p) => sum + (p.stockActuel * p.prixAchatHt), 0);
+  // Valeur du stock affichée en TTC (préférer le TTC stocké, sinon dérivé)
+  const stockValue = produits.reduce((sum, p) => {
+    const achatTtc = p.prixAchatTtc > 0 ? p.prixAchatTtc : htToTtc(p.prixAchatHt, p.tauxTva ?? 20);
+    return sum + (p.stockActuel * achatTtc);
+  }, 0);
   const avgMargin = produitsCount > 0
     ? produits.reduce((sum, p) => {
         const margin = p.prixVenteHt > 0 ? ((p.prixVenteHt - p.prixAchatHt) / p.prixVenteHt) * 100 : 0;
@@ -278,7 +282,6 @@ export function ProduitsList() {
                     <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 dark:text-slate-400">{t('produits.col_buy_price')}</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 dark:text-slate-400">{t('produits.col_sale_price')}</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 dark:text-slate-400">{t('produits.col_vat')}</TableHead>
-                    <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 dark:text-slate-400">{t('produits.col_price_ttc')}</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 text-right dark:text-slate-400">{t('produits.col_stock')}</TableHead>
                     <TableHead className="text-xs font-semibold text-slate-500 uppercase tracking-wider px-4 py-3 text-right dark:text-slate-400">{t('produits.col_actions')}</TableHead>
                   </TableRow>
@@ -286,7 +289,7 @@ export function ProduitsList() {
                 <TableBody>
                   {isLoading ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="h-48 text-center">
+                      <TableCell colSpan={8} className="h-48 text-center">
                         <div className="flex flex-col items-center justify-center gap-3">
                           <div className="h-8 w-8 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
                           <p className="text-sm text-muted-foreground font-medium">{t('produits.loading')}</p>
@@ -295,7 +298,7 @@ export function ProduitsList() {
                     </TableRow>
                   ) : paginatedProduits.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={9} className="h-48 text-center">
+                      <TableCell colSpan={8} className="h-48 text-center">
                         <div className="flex flex-col items-center justify-center gap-3">
                         <div className="bg-slate-50 rounded-[6px] p-4 border border-slate-100 dark:bg-[#0F172A]/40 dark:border-white/10">
                           <Package className="h-8 w-8 text-slate-300 dark:text-slate-600" />
@@ -360,21 +363,16 @@ export function ProduitsList() {
                         </TableCell>
                         <TableCell className="px-4 py-5">
                           <span className="text-sm text-slate-500 dark:text-slate-400">
-                            {formatCurrency(produit.prixAchatHt)}
+                            {formatCurrency(produit.prixAchatTtc > 0 ? produit.prixAchatTtc : htToTtc(produit.prixAchatHt, produit.tauxTva ?? 20))}
                           </span>
                         </TableCell>
                         <TableCell className="px-4 py-5">
-                          <span className="text-sm text-slate-500 dark:text-slate-400">
-                            {formatCurrency(produit.prixVenteHt)}
+                          <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
+                            {formatCurrency(produit.prixVenteTtc > 0 ? produit.prixVenteTtc : htToTtc(produit.prixVenteHt, produit.tauxTva ?? 20))}
                           </span>
                         </TableCell>
                         <TableCell className="px-4 py-5">
                           <span className="text-xs text-slate-400 dark:text-slate-500">{produit.tauxTva}%</span>
-                        </TableCell>
-                        <TableCell className="px-4 py-5">
-                          <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">
-                            {formatCurrency(produit.prixVenteTtc)}
-                          </span>
                         </TableCell>
                         <TableCell className="px-4 py-5 text-right">
                           <div className="flex items-center justify-end gap-1.5">

@@ -8,7 +8,10 @@ import {
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { cn, formatCurrencyLocale } from '@/lib/utils'
+import { cn, formatCurrencyLocale, formatAmount } from '@/lib/utils'
+import {
+  type DateRangeKey, getDateRange, applyDateFilter, toIntlLocale,
+} from '@/lib/dateRange'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -19,89 +22,6 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-
-// ─── Date range helpers (identical behaviour to the Dashboard filter) ────────
-
-export type DateRangeKey =
-  | 'today' | 'yesterday' | 'this_week' | 'last_week'
-  | 'this_month' | 'last_month' | 'this_year' | 'last_year'
-  | 'all' | 'custom'
-
-function getDateRange(
-  option: DateRangeKey,
-  customStart?: string,
-  customEnd?: string,
-): { start: Date | null; end: Date | null } {
-  const now = new Date()
-  const start = new Date(now)
-  const end = new Date(now)
-
-  switch (option) {
-    case 'today':
-      start.setHours(0, 0, 0, 0)
-      end.setHours(23, 59, 59, 999)
-      break
-    case 'yesterday':
-      start.setDate(start.getDate() - 1)
-      start.setHours(0, 0, 0, 0)
-      end.setDate(end.getDate() - 1)
-      end.setHours(23, 59, 59, 999)
-      break
-    case 'this_week': {
-      const day = start.getDay()
-      const diff = day === 0 ? 6 : day - 1
-      start.setDate(start.getDate() - diff)
-      start.setHours(0, 0, 0, 0)
-      break
-    }
-    case 'last_week': {
-      const day = start.getDay()
-      const diff = day === 0 ? 6 : day - 1
-      start.setDate(start.getDate() - diff - 7)
-      start.setHours(0, 0, 0, 0)
-      end.setDate(end.getDate() - diff - 1)
-      end.setHours(23, 59, 59, 999)
-      break
-    }
-    case 'this_month':
-      start.setDate(1)
-      start.setHours(0, 0, 0, 0)
-      break
-    case 'last_month':
-      start.setMonth(start.getMonth() - 1, 1)
-      start.setHours(0, 0, 0, 0)
-      end.setMonth(end.getMonth(), 0)
-      end.setHours(23, 59, 59, 999)
-      break
-    case 'this_year':
-      start.setMonth(0, 1)
-      start.setHours(0, 0, 0, 0)
-      break
-    case 'last_year':
-      start.setFullYear(start.getFullYear() - 1, 0, 1)
-      start.setHours(0, 0, 0, 0)
-      end.setFullYear(end.getFullYear() - 1, 11, 31)
-      end.setHours(23, 59, 59, 999)
-      break
-    case 'custom': {
-      const s = customStart ? new Date(customStart) : null
-      const e = customEnd ? new Date(customEnd) : null
-      if (s) s.setHours(0, 0, 0, 0)
-      if (e) e.setHours(23, 59, 59, 999)
-      return { start: s, end: e }
-    }
-    case 'all':
-    default:
-      return { start: null, end: null }
-  }
-  return { start, end }
-}
-
-function applyDateFilter(q: any, field: string, start: Date | null, end: Date | null) {
-  if (start) q = q.gte(field, start.toISOString())
-  if (end) q = q.lte(field, end.toISOString())
-  return q
-}
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -123,8 +43,8 @@ interface SaleRow {
   productName: string
   barcode: string | null
   quantite: number
-  prixUnitaire: number    // unit price HT
-  montant: number         // total HT for the line
+  prixUnitaire: number    // unit price TTC (displayed tax-included)
+  montant: number         // total TTC for the line
   source: SaleSource
   documentNumber: string
   clientName: string | null
@@ -137,14 +57,6 @@ type SortDir = 'asc' | 'desc'
 
 const ITEMS_PER_PAGE = 10
 
-// ─── Locale helpers ────────────────────────────────────────────────────────
-
-function toDateLocale(lang: string): string {
-  if (lang.startsWith('ar')) return 'ar-MA'
-  if (lang.startsWith('en')) return 'en-US'
-  return 'fr-FR'
-}
-
 // ─── Component ─────────────────────────────────────────────────────────────
 
 export function ProductSalesFilter() {
@@ -152,7 +64,7 @@ export function ProductSalesFilter() {
   const { t, i18n } = useTranslation()
   const lang = i18n.language ?? 'fr'
   const isRTL = lang.startsWith('ar')
-  const dateFmt = toDateLocale(lang)
+  const dateFmt = toIntlLocale(lang)
 
   const tp = (key: string, opts?: Record<string, unknown>): string =>
     t(`dashboard.product_filter.${key}`, opts as any) as unknown as string
@@ -358,8 +270,11 @@ export function ProductSalesFilter() {
           productName: l.designation || tp('unknown_product'),
           barcode: barcodeOf(l.produit_id),
           quantite: Number(l.quantite || 0),
-          prixUnitaire: Number(l.prix_unitaire_ht || 0),
-          montant: Number(l.montant_ht || 0),
+          // Affichage TTC : préférer les montants TTC stockés, sinon dérivés du HT
+          prixUnitaire: Number(l.prix_unitaire_ht || 0) * (1 + Number(l.tva ?? 20) / 100),
+          montant: Number(l.montant_ttc || 0) > 0
+            ? Number(l.montant_ttc)
+            : Number(l.montant_ht || 0) * (1 + Number(l.tva ?? 20) / 100),
           source: 'facture',
           documentNumber: parent.numero ?? '—',
           clientName: clientName(parent),
@@ -379,8 +294,11 @@ export function ProductSalesFilter() {
           productName: l.designation || tp('unknown_product'),
           barcode: barcodeOf(l.produit_id),
           quantite: Number(l.quantite || 0),
-          prixUnitaire: Number(l.prix_unitaire_ht || 0),
-          montant: Number(l.montant_ht || 0),
+          // Affichage TTC : préférer les montants TTC stockés, sinon dérivés du HT
+          prixUnitaire: Number(l.prix_unitaire_ht || 0) * (1 + Number(l.tva ?? 20) / 100),
+          montant: Number(l.montant_ttc || 0) > 0
+            ? Number(l.montant_ttc)
+            : Number(l.montant_ht || 0) * (1 + Number(l.tva ?? 20) / 100),
           source: 'vente_passager',
           documentNumber: parent.numero ?? '—',
           clientName: parent.client_nom || null,
@@ -567,8 +485,8 @@ export function ProductSalesFilter() {
           truncate(r.productName, 28),
           r.barcode ?? '',
           String(r.quantite),
-          r.prixUnitaire.toFixed(2),
-          r.montant.toFixed(2),
+          formatAmount(r.prixUnitaire),
+          formatAmount(r.montant),
           sourceLabel(r.source),
           r.documentNumber,
           truncate(r.clientName ?? '', 16),

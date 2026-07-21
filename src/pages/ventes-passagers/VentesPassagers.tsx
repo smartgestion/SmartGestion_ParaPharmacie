@@ -12,7 +12,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, ttcToHt } from '@/lib/utils'
+import { TtcPriceInput } from '@/components/ui/TtcPriceInput'
 import { toast } from 'sonner'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
 import {
@@ -154,12 +155,12 @@ export default function VentesPassagers() {
   };
 
   // Allow editing the unit selling price of a cart line (e.g. when
-  // negotiating with the client). Recomputes the line totals on change.
-  const updatePanierPrice = (index: number, rawValue: string) => {
-    const newPu = Number(rawValue);
+  // negotiating with the client). The user edits the TTC price; the HT
+  // equivalent is stored internally. Recomputes the line totals on change.
+  const updatePanierPriceHt = (index: number, newHt: number) => {
     setPanier(panier.map((item, idx) => {
       if (idx !== index) return item;
-      const pu = isNaN(newPu) || newPu < 0 ? 0 : newPu;
+      const pu = isNaN(newHt) || newHt < 0 ? 0 : newHt;
       const mht = pu * item.quantite;
       const mtva = mht * (Number(item.tva || 0) / 100);
       const mttc = mht + mtva;
@@ -841,8 +842,11 @@ export default function VentesPassagers() {
                 <ProductSelector
                   produits={produits}
                   onSelect={(produit, qte) => {
-                    const puHt = Number(produit.prixVenteHt ?? 0);
                     const tvaRate = Number(produit.tauxTva ?? 20);
+                    // Préférer le TTC catalogue (conversion exacte) ; le HT
+                    // reste la valeur stockée en interne.
+                    const ttcProd = Number(produit.prixVenteTtc ?? 0);
+                    const puHt = ttcProd > 0 ? ttcToHt(ttcProd, tvaRate) : Number(produit.prixVenteHt ?? 0);
                     const mht = puHt * qte;
                     const mtva = mht * (tvaRate / 100);
                     const mttc = mht + mtva;
@@ -924,12 +928,11 @@ export default function VentesPassagers() {
                             <span className="inline-flex items-center justify-center min-w-[32px] h-7 px-2.5 rounded-sm dark:bg-slate-800 bg-slate-100 text-sm font-bold dark:text-card-foreground text-slate-700">{item.quantite}</span>
                           </TableCell>
                           <TableCell className="px-5 py-4 text-right">
-                            <Input
-                              type="number"
+                            <TtcPriceInput
                               min={0}
-                              step="0.01"
-                              value={item.prixUnitaireHt}
-                              onChange={(e) => updatePanierPrice(index, e.target.value)}
+                              htValue={item.prixUnitaireHt}
+                              tvaRate={Number(item.tva || 0)}
+                              onHtChange={(ht) => updatePanierPriceHt(index, ht)}
                               className="h-8 w-24 ms-auto text-right text-sm dark:bg-slate-900/50 dark:border-white/10 bg-white border-slate-300"
                             />
                           </TableCell>

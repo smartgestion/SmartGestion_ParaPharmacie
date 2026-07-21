@@ -16,6 +16,7 @@ import { PriceCalculatorDialog, type PriceCalculatorResult } from '@/components/
 import { Calculator } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { htToTtc, ttcToHt } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { ImageUpload } from '@/components/ui/ImageUpload'
@@ -40,10 +41,12 @@ export function ProduitForm({ initialData, onSuccess }: ProduitFormProps) {
   });
 
   function handleCalcConfirm(res: PriceCalculatorResult) {
-    // Prix Vendre TTC = Prix Vente HT × (1 + TVA/100)
+    // Les champs du formulaire sont désormais saisis en TTC ; le HT est
+    // dérivé automatiquement à l'enregistrement.
     const venteTtc = Number((res.prixVenteHT * (1 + res.tva / 100)).toFixed(2));
-    form.setValue('prixVenteHt', res.prixVenteHT, { shouldValidate: true, shouldDirty: true });
-    form.setValue('prixAchatHt', res.prixAchatHT, { shouldValidate: true, shouldDirty: true });
+    const achatTtc = Number((res.prixAchatHT * (1 + res.tva / 100)).toFixed(2));
+    form.setValue('prixVenteTtc', venteTtc, { shouldValidate: true, shouldDirty: true });
+    form.setValue('prixAchatTtc', achatTtc, { shouldValidate: true, shouldDirty: true });
     form.setValue('tauxTva', res.tva, { shouldValidate: true, shouldDirty: true });
     // Lier ces valeurs au produit pour les ré-utiliser (Produit + Bon de Commande)
     setCalcValues({ ttc: `${venteTtc}`, tva: `${res.tva}`, remise: `${res.remise}` });
@@ -55,8 +58,8 @@ export function ProduitForm({ initialData, onSuccess }: ProduitFormProps) {
     description: z.string().optional(),
     marque: z.string().optional(),
     barcode: z.string().optional(),
-    prixVenteHt: z.coerce.number().min(0),
-    prixAchatHt: z.coerce.number().min(0),
+    prixVenteTtc: z.coerce.number().min(0),
+    prixAchatTtc: z.coerce.number().min(0),
     tauxTva: z.coerce.number().min(0).max(100),
     stockActuel: z.coerce.number().int(),
     stockMin: z.coerce.number().int().optional(),
@@ -74,8 +77,12 @@ export function ProduitForm({ initialData, onSuccess }: ProduitFormProps) {
       marque: initialData?.marque || '',
       barcode: initialData?.barcode || '',
       description: initialData?.description || '',
-      prixVenteHt: initialData?.prixVenteHt || 0,
-      prixAchatHt: initialData?.prixAchatHt || 0,
+      prixVenteTtc: Number(initialData?.prixVenteTtc) > 0
+        ? initialData.prixVenteTtc
+        : htToTtc(initialData?.prixVenteHt || 0, initialData?.tauxTva ?? initialData?.tva ?? 20),
+      prixAchatTtc: Number(initialData?.prixAchatTtc) > 0
+        ? initialData.prixAchatTtc
+        : htToTtc(initialData?.prixAchatHt || 0, initialData?.tauxTva ?? initialData?.tva ?? 20),
       tauxTva: initialData?.tauxTva ?? initialData?.tva ?? 20,
       stockActuel: initialData?.stockActuel || 0,
       stockMin: initialData?.stockMin || 5,
@@ -86,7 +93,18 @@ export function ProduitForm({ initialData, onSuccess }: ProduitFormProps) {
 
   useEffect(() => {
     if (initialData) {
-      form.reset(initialData);
+      // Les prix sont édités en TTC ; si le TTC stocké est absent (anciens
+      // produits), il est dérivé du HT via le taux de TVA.
+      const tva = initialData?.tauxTva ?? initialData?.tva ?? 20;
+      form.reset({
+        ...initialData,
+        prixVenteTtc: Number(initialData?.prixVenteTtc) > 0
+          ? initialData.prixVenteTtc
+          : htToTtc(initialData?.prixVenteHt || 0, tva),
+        prixAchatTtc: Number(initialData?.prixAchatTtc) > 0
+          ? initialData.prixAchatTtc
+          : htToTtc(initialData?.prixAchatHt || 0, tva),
+      });
     } else {
       generateReference().then(ref => form.setValue('reference', ref));
     }
@@ -114,11 +132,12 @@ export function ProduitForm({ initialData, onSuccess }: ProduitFormProps) {
 
   async function onSubmit(data: ProduitFormValues) {
     try {
-      const prixVenteHT = Number(data.prixVenteHt) || 0;
-      const prixAchatHT = Number(data.prixAchatHt) || 0;
+      // Saisie en TTC ; le HT (base de stockage/calculs) est dérivé.
       const tauxTVA = data.tauxTva == null || isNaN(Number(data.tauxTva)) ? 20 : Number(data.tauxTva);
-      const prixVenteTTC = prixVenteHT * (1 + tauxTVA / 100);
-      const prixAchatTTC = prixAchatHT * (1 + tauxTVA / 100);
+      const prixVenteTTC = Number(data.prixVenteTtc) || 0;
+      const prixAchatTTC = Number(data.prixAchatTtc) || 0;
+      const prixVenteHT = ttcToHt(prixVenteTTC, tauxTVA);
+      const prixAchatHT = ttcToHt(prixAchatTTC, tauxTVA);
       const stockActuel = Number(data.stockActuel) || 0;
       const stockMin = Number(data.stockMin) || 5;
 
@@ -300,10 +319,10 @@ export function ProduitForm({ initialData, onSuccess }: ProduitFormProps) {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <FormField
             control={form.control}
-            name="prixAchatHt"
+            name="prixAchatTtc"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t('shared.form.buy_price_ht')}</FormLabel>
+                <FormLabel>{t('shared.form.buy_price_ttc')}</FormLabel>
                 <FormControl>
                   <Input type="number" step="0.01" {...field} />
                 </FormControl>
@@ -314,10 +333,10 @@ export function ProduitForm({ initialData, onSuccess }: ProduitFormProps) {
 
           <FormField
             control={form.control}
-            name="prixVenteHt"
+            name="prixVenteTtc"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>{t('shared.form.sale_price_ht')}</FormLabel>
+                <FormLabel>{t('shared.form.sale_price_ttc')}</FormLabel>
                 <FormControl>
                   <Input type="number" step="0.01" {...field} />
                 </FormControl>

@@ -31,7 +31,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'FACTURE',
       entityLabel: 'Client',
       labels: { numero: 'Numéro', date: 'Date', reference: 'Référence', modePaiement: 'Mode de Règlement', echeance: 'Échéance', agent: 'Agent' },
-      itemCols: ['Référence', 'Désignation', 'Qté', 'PU HT', 'Montant HT'],
+      itemCols: ['Référence', 'Désignation', 'Qté', 'PU TTC', 'Montant TTC'],
       totals: { ht: 'Total HT', ttc: 'Total TTC', vatPrefix: 'TVA', dhs: 'DHS' },
       words: { arrête: 'Arrêté le présent document à la somme de :', dirhams: 'dirhams', centimes: 'centimes' },
       signature: { client: 'Cachet et Signature du Client', company: 'Cachet et Signature de la Société' },
@@ -45,7 +45,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'DEVIS',
       entityLabel: 'Client',
       labels: { numero: 'Numéro', date: 'Date', reference: 'Référence', modePaiement: 'Mode de Règlement', echeance: 'Échéance', agent: 'Agent' },
-      itemCols: ['Référence', 'Désignation', 'Qté', 'PU HT', 'Montant HT'],
+      itemCols: ['Référence', 'Désignation', 'Qté', 'PU TTC', 'Montant TTC'],
       totals: { ht: 'Total HT', ttc: 'Total TTC', vatPrefix: 'TVA', dhs: 'DHS' },
       words: { arrête: 'Arrêté le présent document à la somme de :', dirhams: 'dirhams', centimes: 'centimes' },
       signature: { client: 'Cachet et Signature du Client', company: 'Cachet et Signature de la Société' },
@@ -59,7 +59,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'BON DE COMMANDE',
       entityLabel: 'Fournisseur',
       labels: { numero: 'Numéro', date: 'Date', reference: 'Référence', modePaiement: 'Mode de Règlement', echeance: 'Échéance', agent: 'Agent' },
-      itemCols: ['Référence', 'Désignation', 'Qté', 'PU HT', 'Montant HT'],
+      itemCols: ['Référence', 'Désignation', 'Qté', 'PU TTC', 'Montant TTC'],
       totals: { ht: 'Total HT', ttc: 'Total TTC', vatPrefix: 'TVA', dhs: 'DHS' },
       words: { arrête: 'Arrêté le présent document à la somme de :', dirhams: 'dirhams', centimes: 'centimes' },
       signature: { client: 'Cachet et Signature du Fournisseur', company: 'Cachet et Signature de la Société' },
@@ -73,7 +73,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'BON DE LIVRAISON',
       entityLabel: 'Fournisseur',
       labels: { numero: 'Numéro', date: 'Date', reference: 'Référence', modePaiement: 'Mode de Règlement', echeance: 'Échéance', agent: 'Agent' },
-      itemCols: ['Référence', 'Désignation', 'Qté', 'PU HT', 'Montant HT'],
+      itemCols: ['Référence', 'Désignation', 'Qté', 'PU TTC', 'Montant TTC'],
       totals: { ht: 'Total HT', ttc: 'Total TTC', vatPrefix: 'TVA', dhs: 'DHS' },
       words: { arrête: 'Arrêté le présent document à la somme de :', dirhams: 'dirhams', centimes: 'centimes' },
       signature: { client: 'Cachet et Signature du Fournisseur', company: 'Cachet et Signature de la Société' },
@@ -89,7 +89,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'INVOICE',
       entityLabel: 'Client',
       labels: { numero: 'No.', date: 'Date', reference: 'Reference', modePaiement: 'Payment Method', echeance: 'Due Date', agent: 'Agent' },
-      itemCols: ['Reference', 'Description', 'Qty', 'Unit Price', 'Total'],
+      itemCols: ['Reference', 'Description', 'Qty', 'Unit Price (incl. tax)', 'Total (incl. tax)'],
       totals: { ht: 'Total (excl. tax)', ttc: 'Total (incl. tax)', vatPrefix: 'VAT', dhs: 'MAD' },
       words: { arrête: 'Total amount in words:', dirhams: 'MAD', centimes: 'Centimes' },
       signature: { client: 'Client Signature & Stamp', company: 'Company Signature & Stamp' },
@@ -103,7 +103,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'QUOTE',
       entityLabel: 'Client',
       labels: { numero: 'No.', date: 'Date', reference: 'Reference', modePaiement: 'Payment Method', echeance: 'Valid Until', agent: 'Agent' },
-      itemCols: ['Reference', 'Description', 'Qty', 'Unit Price', 'Total'],
+      itemCols: ['Reference', 'Description', 'Qty', 'Unit Price (incl. tax)', 'Total (incl. tax)'],
       totals: { ht: 'Total (excl. tax)', ttc: 'Total (incl. tax)', vatPrefix: 'VAT', dhs: 'MAD' },
       words: { arrête: 'Total amount in words:', dirhams: 'MAD', centimes: 'Centimes' },
       signature: { client: 'Client Signature & Stamp', company: 'Company Signature & Stamp' },
@@ -117,7 +117,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'PURCHASE ORDER',
       entityLabel: 'Supplier',
       labels: { numero: 'No.', date: 'Date', reference: 'Reference', modePaiement: 'Payment Method', echeance: 'Due Date', agent: 'Agent' },
-      itemCols: ['Reference', 'Description', 'Qty', 'Unit Price', 'Total'],
+      itemCols: ['Reference', 'Description', 'Qty', 'Unit Price (incl. tax)', 'Total (incl. tax)'],
       totals: { ht: 'Total (excl. tax)', ttc: 'Total (incl. tax)', vatPrefix: 'VAT', dhs: 'MAD' },
       words: { arrête: 'Total amount in words:', dirhams: 'MAD', centimes: 'Centimes' },
       signature: { client: 'Supplier Signature & Stamp', company: 'Company Signature & Stamp' },
@@ -131,7 +131,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'DELIVERY NOTE',
       entityLabel: 'Supplier',
       labels: { numero: 'No.', date: 'Date', reference: 'Reference', modePaiement: 'Payment Method', echeance: 'Due Date', agent: 'Agent' },
-      itemCols: ['Reference', 'Description', 'Qty', 'Unit Price', 'Total'],
+      itemCols: ['Reference', 'Description', 'Qty', 'Unit Price (incl. tax)', 'Total (incl. tax)'],
       totals: { ht: 'Total (excl. tax)', ttc: 'Total (incl. tax)', vatPrefix: 'VAT', dhs: 'MAD' },
       words: { arrête: 'Total amount in words:', dirhams: 'MAD', centimes: 'Centimes' },
       signature: { client: 'Supplier Signature & Stamp', company: 'Company Signature & Stamp' },
@@ -147,7 +147,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'فاتورة',
       entityLabel: 'العميل',
       labels: { numero: 'الرقم', date: 'التاريخ', reference: 'المرجع', modePaiement: 'طريقة الدفع', echeance: 'تاريخ الاستحقاق', agent: 'الوكيل' },
-      itemCols: ['المرجع', 'البيان', 'الكمية', 'ثمن الوحدة', 'المبلغ'],
+      itemCols: ['المرجع', 'البيان', 'الكمية', 'ثمن الوحدة (شامل الضريبة)', 'المبلغ (شامل الضريبة)'],
       totals: { ht: 'المجموع (خ.ض)', ttc: 'المجموع شامل الرسوم', vatPrefix: 'ض.ق.م', dhs: 'درهم' },
       words: { arrête: 'المبلغ الإجمالي بالحروف:', dirhams: 'درهما', centimes: 'سنتيما' },
       signature: { client: 'ختم وتوقيع العميل', company: 'ختم وتوقيع الشركة' },
@@ -161,7 +161,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'عرض سعر',
       entityLabel: 'العميل',
       labels: { numero: 'الرقم', date: 'التاريخ', reference: 'المرجع', modePaiement: 'طريقة الدفع', echeance: 'تاريخ الصلاحية', agent: 'الوكيل' },
-      itemCols: ['المرجع', 'البيان', 'الكمية', 'ثمن الوحدة', 'المبلغ'],
+      itemCols: ['المرجع', 'البيان', 'الكمية', 'ثمن الوحدة (شامل الضريبة)', 'المبلغ (شامل الضريبة)'],
       totals: { ht: 'المجموع (خ.ض)', ttc: 'المجموع شامل الرسوم', vatPrefix: 'ض.ق.م', dhs: 'درهم' },
       words: { arrête: 'المبلغ الإجمالي بالحروف:', dirhams: 'درهما', centimes: 'سنتيما' },
       signature: { client: 'ختم وتوقيع العميل', company: 'ختم وتوقيع الشركة' },
@@ -175,7 +175,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'أمر شراء',
       entityLabel: 'المورد',
       labels: { numero: 'الرقم', date: 'التاريخ', reference: 'المرجع', modePaiement: 'طريقة الدفع', echeance: 'تاريخ الاستحقاق', agent: 'الوكيل' },
-      itemCols: ['المرجع', 'البيان', 'الكمية', 'ثمن الوحدة', 'المبلغ'],
+      itemCols: ['المرجع', 'البيان', 'الكمية', 'ثمن الوحدة (شامل الضريبة)', 'المبلغ (شامل الضريبة)'],
       totals: { ht: 'المجموع (خ.ض)', ttc: 'المجموع شامل الرسوم', vatPrefix: 'ض.ق.م', dhs: 'درهم' },
       words: { arrête: 'المبلغ الإجمالي بالحروف:', dirhams: 'درهما', centimes: 'سنتيما' },
       signature: { client: 'ختم وتوقيع المورد', company: 'ختم وتوقيع الشركة' },
@@ -189,7 +189,7 @@ const DOCUMENT_LABELS: Record<string, Record<string, DocumentLabels>> = {
       title: 'إيصال تسليم',
       entityLabel: 'المورد',
       labels: { numero: 'الرقم', date: 'التاريخ', reference: 'المرجع', modePaiement: 'طريقة الدفع', echeance: 'تاريخ الاستحقاق', agent: 'الوكيل' },
-      itemCols: ['المرجع', 'البيان', 'الكمية', 'ثمن الوحدة', 'المبلغ'],
+      itemCols: ['المرجع', 'البيان', 'الكمية', 'ثمن الوحدة (شامل الضريبة)', 'المبلغ (شامل الضريبة)'],
       totals: { ht: 'المجموع (خ.ض)', ttc: 'المجموع شامل الرسوم', vatPrefix: 'ض.ق.م', dhs: 'درهم' },
       words: { arrête: 'المبلغ الإجمالي بالحروف:', dirhams: 'درهما', centimes: 'سنتيما' },
       signature: { client: 'ختم وتوقيع المورد', company: 'ختم وتوقيع الشركة' },
@@ -308,13 +308,22 @@ function numberToWordsCurrency(amount: number, labels?: DocumentLabels): string 
   return result.charAt(0).toUpperCase() + result.slice(1);
 }
 
-function formatCurrency(value: number, decimals: number = 2): string {
-  // Strip trailing zeros: integers show no decimals, floats keep up to 2
-  // significant fraction digits (e.g. 269 -> "269", 53.8 -> "53,8",
-  // 53.85 -> "53,85"). The `decimals` argument now only caps the maximum.
+function formatCurrency(value: number, _decimals: number = 2): string {
+  // Money is ALWAYS displayed with exactly two decimals (e.g. 269 -> "269,00",
+  // 53.8 -> "53,80", 199.999 -> "200,00"). Display-only formatting; the stored
+  // numeric value is never altered. The `_decimals` argument is kept for
+  // call-site compatibility but no longer changes the output.
+  return new Intl.NumberFormat('fr-FR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+// Quantities are NOT money: keep trailing zeros stripped (10 -> "10", 1.5 -> "1,5").
+function formatQty(value: number): string {
   return new Intl.NumberFormat('fr-FR', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: Math.min(decimals, 2),
+    maximumFractionDigits: 2,
   }).format(value);
 }
 
@@ -413,6 +422,9 @@ function generateHTML(data: DocumentData): string {
     const tvaRate = Number(item.tva ?? 20);
     const montantTVA = montantHT * (tvaRate / 100);
     const montantTTC = montantHT + montantTVA;
+    // Affichage TTC : le PU et le montant de ligne sont convertis pour
+    // l'impression ; les valeurs HT restent la base des calculs/totaux.
+    const puTTC = pu * (1 + tvaRate / 100);
 
     totalHT += montantHT;
     totalTVA += montantTVA;
@@ -422,9 +434,9 @@ function generateHTML(data: DocumentData): string {
       <tr>
         <td style="padding:5px 6px;font-size:9pt;text-align:left;border-bottom:0.5pt solid #E5E7EB;">${item.reference || '-'}</td>
         <td style="padding:5px 6px;font-size:9pt;text-align:left;border-bottom:0.5pt solid #E5E7EB;">${item.designation}</td>
-        <td style="padding:5px 6px;font-size:9pt;text-align:right;border-bottom:0.5pt solid #E5E7EB;">${formatCurrency(qte)}</td>
-        <td style="padding:5px 6px;font-size:9pt;text-align:right;border-bottom:0.5pt solid #E5E7EB;">${formatCurrency(pu, 4)}</td>
-        <td style="padding:5px 6px;font-size:9pt;text-align:right;font-weight:600;border-bottom:0.5pt solid #E5E7EB;">${formatCurrency(montantHT)}</td>
+        <td style="padding:5px 6px;font-size:9pt;text-align:right;border-bottom:0.5pt solid #E5E7EB;">${formatQty(qte)}</td>
+        <td style="padding:5px 6px;font-size:9pt;text-align:right;border-bottom:0.5pt solid #E5E7EB;">${formatCurrency(puTTC)}</td>
+        <td style="padding:5px 6px;font-size:9pt;text-align:right;font-weight:600;border-bottom:0.5pt solid #E5E7EB;">${formatCurrency(montantTTC)}</td>
       </tr>`;
   }).join('');
 

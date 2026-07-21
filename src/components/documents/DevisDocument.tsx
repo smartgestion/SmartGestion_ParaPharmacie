@@ -1,6 +1,6 @@
 import { forwardRef } from 'react'
 import { format, isValid, parseISO } from 'date-fns'
-import { getDateLocale } from '@/lib/utils'
+import { getDateLocale, formatAmount } from '@/lib/utils'
 import { DOC_COLORS as C } from './docColors'
 
 interface DevisDocumentProps {
@@ -10,7 +10,9 @@ interface DevisDocumentProps {
   lang?: string
 }
 
-const fmt2 = (n: number): string =>
+// Prices use `formatAmount` (always 2 decimals). `fmtLoose` is kept for
+// non-money values (percentages / quantities) that must NOT force decimals.
+const fmtLoose = (n: number): string =>
   new Intl.NumberFormat('fr-FR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n)
 
 const safeNum = (v: any, fallback = 0): number => {
@@ -271,10 +273,10 @@ export const DevisDocument = forwardRef<HTMLDivElement, DevisDocumentProps>(
                       <td style={{ padding: `${rowPadY} 8px`, fontSize: '9.5pt', textAlign: 'center', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.accent, fontWeight: 700 }}>{i + 1}</td>
                       <td style={{ padding: `${rowPadY} 12px`, fontSize: '9.5pt', textAlign: 'left', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>{ligne.designation || '-'}</td>
                       <td style={{ padding: `${rowPadY} 8px`, fontSize: '9.5pt', textAlign: 'center', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}></td>
-                      <td style={{ padding: `${rowPadY} 12px`, fontSize: '9.5pt', textAlign: 'center', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>{fmt2(getQt(ligne))}</td>
-                      <td style={{ padding: `${rowPadY} 12px`, fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>{fmt2(getPrixVenteTtc(ligne))}</td>
-                      <td style={{ padding: `${rowPadY} 8px`, fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>{fmt2(getRemise(ligne))}</td>
-                      <td style={{ padding: `${rowPadY} 12px`, fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text, fontWeight: 700 }}>{fmt2(getPrixAchatTtc(ligne))}</td>
+                      <td style={{ padding: `${rowPadY} 12px`, fontSize: '9.5pt', textAlign: 'center', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>{fmtLoose(getQt(ligne))}</td>
+                      <td style={{ padding: `${rowPadY} 12px`, fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>{formatAmount(getPrixVenteTtc(ligne))}</td>
+                      <td style={{ padding: `${rowPadY} 8px`, fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>{fmtLoose(getRemise(ligne))}</td>
+                      <td style={{ padding: `${rowPadY} 12px`, fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text, fontWeight: 700 }}>{formatAmount(getPrixAchatTtc(ligne))}</td>
                     </tr>
                   ))}
                   {lignes.length === 0 && (
@@ -289,15 +291,15 @@ export const DevisDocument = forwardRef<HTMLDivElement, DevisDocumentProps>(
                   <tbody>
                     <tr>
                       <td style={{ padding: '8px 14px', textAlign: 'left',  background: C.rowAlt, borderBottom: `1px solid ${C.borderSoft}`, color: C.text }}>Total H.T</td>
-                      <td style={{ padding: '8px 14px', textAlign: 'right', background: C.rowAlt, borderBottom: `1px solid ${C.borderSoft}`, color: C.text, fontWeight: 700 }}>{fmt2(totalHt)} DH</td>
+                      <td style={{ padding: '8px 14px', textAlign: 'right', background: C.rowAlt, borderBottom: `1px solid ${C.borderSoft}`, color: C.text, fontWeight: 700 }}>{formatAmount(totalHt)} DH</td>
                     </tr>
                     <tr>
                       <td style={{ padding: '8px 14px', textAlign: 'left',  background: C.rowAlt, color: C.text }}>TVA</td>
-                      <td style={{ padding: '8px 14px', textAlign: 'right', background: C.rowAlt, color: C.text, fontWeight: 700 }}>{fmt2(totalTva)} DH</td>
+                      <td style={{ padding: '8px 14px', textAlign: 'right', background: C.rowAlt, color: C.text, fontWeight: 700 }}>{formatAmount(totalTva)} DH</td>
                     </tr>
                     <tr>
                       <td style={{ padding: '12px 14px', textAlign: 'left',  background: C.accent, color: '#fff', fontWeight: 700, fontSize: '11pt', letterSpacing: 0.5, textTransform: 'uppercase' }}>Total TTC</td>
-                      <td style={{ padding: '12px 14px', textAlign: 'right', background: C.accent, color: '#fff', fontWeight: 800, fontSize: '11pt' }}>{fmt2(totalTtc)} DH</td>
+                      <td style={{ padding: '12px 14px', textAlign: 'right', background: C.accent, color: '#fff', fontWeight: 800, fontSize: '11pt' }}>{formatAmount(totalTtc)} DH</td>
                     </tr>
                   </tbody>
                 </table>

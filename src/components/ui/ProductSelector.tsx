@@ -130,27 +130,20 @@ const ProductCard = ({
           <StockBadge stock={stock} />
         </div>
 
-        {/* Price */}
+        {/* Price — affiché en TTC (préférer le TTC stocké, sinon dérivé du HT) */}
         <div className="flex items-baseline gap-1.5 mt-3">
           <span
             dir={i18n.language.startsWith('ar') ? 'rtl' : 'ltr'}
             className="text-lg font-black text-emerald-600 dark:text-emerald-400"
           >
-            {formatCurrencyLocale(produit.prixVenteHt, i18n.language)}
+            {formatCurrencyLocale(
+              Number(produit.prixVenteTtc) > 0
+                ? produit.prixVenteTtc
+                : Number(produit.prixVenteHt || 0) * (1 + Number(produit.tauxTva ?? 20) / 100),
+              i18n.language,
+            )}
           </span>
-          <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">{t('shared.product_selector.price_ht')}</span>
-          {produit.prixVenteTtc && (
-            <>
-              <span className="text-xs text-slate-300 dark:text-slate-600 mx-0.5">•</span>
-              <span
-                dir={i18n.language.startsWith('ar') ? 'rtl' : 'ltr'}
-                className="text-sm font-bold text-slate-700 dark:text-slate-200"
-              >
-                {formatCurrencyLocale(produit.prixVenteTtc, i18n.language)}
-              </span>
-              <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">{t('shared.product_selector.price_ttc')}</span>
-            </>
-          )}
+          <span className="text-[10px] font-medium text-slate-400 dark:text-slate-500">{t('shared.product_selector.price_ttc')}</span>
           {produit.tauxTva !== undefined && (
             <>
               <span className="text-xs text-slate-300 dark:text-slate-600 mx-0.5">•</span>

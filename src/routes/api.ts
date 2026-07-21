@@ -1,5 +1,6 @@
 ﻿import { Router } from 'express'
 import { supabase, supabaseAdmin } from '../lib/supabase.server'
+import { formatAmount } from '../lib/utils'
 
 const router = Router();
 
@@ -3174,7 +3175,7 @@ router.get('/smart-insights', async (req, res) => {
       insights.push({
         type: 'finance',
         title: 'TVA Ã‰levÃ©e',
-        message: `TVA Ã  payer estimÃ©e: ${tvaAPayer.toFixed(2)} MAD. PrÃ©voyez la trÃ©sorerie.`,
+        message: `TVA Ã  payer estimÃ©e: ${formatAmount(tvaAPayer)} MAD. PrÃ©voyez la trÃ©sorerie.`,
         status: 'warning'
       });
     }

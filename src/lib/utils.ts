@@ -8,6 +8,75 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Formats a monetary amount to EXACTLY two decimal places, WITHOUT any
+ * currency symbol/suffix. Frontend display helper only — never alters the
+ * underlying stored/calculated value.
+ *
+ * Examples (fr-MA grouping):
+ *   10       -> "10,00"
+ *   25.5     -> "25,50"
+ *   199.999  -> "200,00"
+ *   1451.3   -> "1 451,30"
+ *
+ * Use this in document/PDF/label contexts that render their own currency
+ * suffix. For a fully formatted "1 234,56 DH" string use `formatCurrency`.
+ */
+export function formatAmount(amount: number | string | null | undefined): string {
+  const n = Number(amount);
+  if (amount === null || amount === undefined || isNaN(n)) {
+    return "0,00";
+  }
+  return new Intl.NumberFormat('fr-MA', {
+    style: 'decimal',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  }).format(n);
+}
+
+/* ------------------------------------------------------------------ */
+/* HT <-> TTC conversion helpers (frontend display layer)              */
+/*                                                                     */
+/* The backend/database keeps storing HT values (prix_unitaire_ht,     */
+/* montant_ht, ...). These helpers convert at the UI boundary so all   */
+/* prices are DISPLAYED / ENTERED as TTC without changing storage or   */
+/* business logic. Full float precision is kept (no rounding) so a     */
+/* TTC value round-trips exactly: htToTtc(ttcToHt(x, r), r) === x.     */
+/* ------------------------------------------------------------------ */
+
+/** Converts a tax-excluded (HT) amount to tax-included (TTC). */
+export function htToTtc(ht: number | string | null | undefined, tvaRate: number | string | null | undefined): number {
+  const h = Number(ht);
+  const r = Number(tvaRate);
+  if (isNaN(h)) return 0;
+  return h * (1 + (isNaN(r) ? 0 : r) / 100);
+}
+
+/** Converts a tax-included (TTC) amount back to tax-excluded (HT). */
+export function ttcToHt(ttc: number | string | null | undefined, tvaRate: number | string | null | undefined): number {
+  const t = Number(ttc);
+  const r = Number(tvaRate);
+  if (isNaN(t)) return 0;
+  const factor = 1 + (isNaN(r) ? 0 : r) / 100;
+  return factor !== 0 ? t / factor : t;
+}
+
+/**
+ * TTC total for a document line. Prefers the stored `montant_ttc` (avoids
+ * cent drift), otherwise derives it from `montant_ht` or `qte x pu_ht`.
+ */
+export function ligneTtc(ligne: any): number {
+  if (!ligne) return 0;
+  const stored = Number(ligne.montant_ttc ?? ligne.montantTtc);
+  if (!isNaN(stored) && stored > 0) return stored;
+  const tva = Number(ligne.tva ?? ligne.taux_tva ?? ligne.tauxTva ?? 20);
+  const mHt = Number(ligne.montant_ht ?? ligne.montantHt);
+  if (!isNaN(mHt) && mHt > 0) return htToTtc(mHt, tva);
+  const qte = Number(ligne.quantite ?? 1);
+  const pu = Number(ligne.prix_unitaire_ht ?? ligne.prixUnitaireHt ?? 0);
+  return htToTtc(qte * pu, tva);
+}
+
 export function formatCurrency(amount: number | string | null | undefined): string {
   if (amount === null || amount === undefined || isNaN(Number(amount))) {
     return "0,00 DH";

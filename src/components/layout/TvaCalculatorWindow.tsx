@@ -3,7 +3,7 @@ import type { MouseEvent as ReactMouseEvent, KeyboardEvent as ReactKeyboardEvent
 import { createPortal } from 'react-dom'
 import { Calculator, Copy, Check, X, GripVertical } from 'lucide-react'
 import { Input } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
+import { cn, formatAmount } from '@/lib/utils'
 
 /**
  * Calculateur TVA — fenêtre flottante (draggable + resizable).
@@ -29,12 +29,8 @@ const MIN_H = 380
 const DEFAULT_W = 340
 const DEFAULT_H = 440
 
-/** Formatage FR : 2 décimales, séparateur de milliers espace, virgule décimale. */
-const frFormatter = new Intl.NumberFormat('fr-FR', {
-  minimumFractionDigits: 2,
-  maximumFractionDigits: 2,
-})
-const formatFR = (n: number) => frFormatter.format(n)
+/** Formatage monétaire centralisé : toujours 2 décimales. */
+const formatFR = (n: number) => formatAmount(n)
 
 /** Convertit une saisie FR/EN ("1 234,56" ou "1234.56") en nombre. */
 function parseNumber(raw: string): number {

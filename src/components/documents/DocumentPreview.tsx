@@ -1,6 +1,6 @@
 import { forwardRef, useMemo } from 'react'
 import { format, isValid, parseISO } from 'date-fns'
-import { getDateLocale } from '@/lib/utils'
+import { getDateLocale, formatAmount } from '@/lib/utils'
 import { numberToFrenchWords } from '@/lib/numberToWords'
 import { DOC_COLORS as C } from './docColors'
 
@@ -16,10 +16,9 @@ interface DocumentPreviewProps {
 
 const ITEMS_PER_PAGE = 22
 
-const fmt2 = (n: number): string =>
-  new Intl.NumberFormat('fr-MA', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n)
-
-const fmt4 = (n: number): string =>
+// Prices use `formatAmount` (always 2 decimals). `fmtLoose` is kept for
+// non-money values (percentages / quantities) that must NOT force decimals.
+const fmtLoose = (n: number): string =>
   new Intl.NumberFormat('fr-MA', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n)
 
 const safeNum = (v: any, fallback = 0): number => {
@@ -148,11 +147,15 @@ export const DocumentPreview = forwardRef<HTMLDivElement, DocumentPreviewProps>(
       let carryTotal = 0
       while (idx < lignes.length) {
         const chunk = lignes.slice(idx, idx + ITEMS_PER_PAGE)
+        // Report cumulé affiché en TTC (cohérent avec la colonne Montant TTC)
         const chunkTotal = chunk.reduce((s: number, l: any) => {
           const qte = safeNum(l.quantite, 1)
           const pu = pickNum(l, 'prixUnitaireHt', 'prix_unitaire_ht')
           const mHt = pickNum(l, 'montantHt', 'montant_ht')
-          return s + (mHt > 0 ? mHt : qte * pu)
+          const mTtcStored = pickNum(l, 'montantTtc', 'montant_ttc')
+          const tva = safeNum(l.tva, 20)
+          const mTtc = mTtcStored > 0 ? mTtcStored : (mHt > 0 ? mHt : qte * pu) * (1 + tva / 100)
+          return s + mTtc
         }, 0)
         idx += ITEMS_PER_PAGE
         const isLast = idx >= lignes.length
@@ -166,6 +169,12 @@ export const DocumentPreview = forwardRef<HTMLDivElement, DocumentPreviewProps>(
     const getQt = (l: any) => safeNum(l.quantite, 1)
     const getMt = (l: any) => { const m = pickNum(l, 'montantHt', 'montant_ht'); return m > 0 ? m : getPu(l) * getQt(l) }
     const getTva = (l: any) => safeNum(l.tva, 20)
+    // Affichage TTC : PU et Montant de ligne convertis (HT stocké inchangé)
+    const getPuTtc = (l: any) => getPu(l) * (1 + getTva(l) / 100)
+    const getMtTtc = (l: any) => {
+      const stored = pickNum(l, 'montantTtc', 'montant_ttc')
+      return stored > 0 ? stored : getMt(l) * (1 + getTva(l) / 100)
+    }
     const getRemise = (l: any) => pickNum(l, 'remise', 'remise_pct')
     // Prix d'Achat TTC unitaire = Prix unitaire HT × (1 + TVA/100)
     const getPrixAchatTtc = (l: any) => getPu(l) * (1 + getTva(l) / 100)
@@ -397,9 +406,9 @@ export const DocumentPreview = forwardRef<HTMLDivElement, DocumentPreviewProps>(
                       <tr style={{ background: C.accent, color: '#fff' }}>
                         <th style={{ padding: '10px 8px', fontSize: '9.5pt', fontWeight: 700, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 }}>N°</th>
                         <th style={{ padding: '10px 12px', fontSize: '9.5pt', fontWeight: 700, textAlign: 'left',   textTransform: 'uppercase', letterSpacing: 0.5 }}>Désignation</th>
-                        <th style={{ padding: '10px 12px', fontSize: '9.5pt', fontWeight: 700, textAlign: 'right',  textTransform: 'uppercase', letterSpacing: 0.5 }}>P.U. HT</th>
+                        <th style={{ padding: '10px 12px', fontSize: '9.5pt', fontWeight: 700, textAlign: 'right',  textTransform: 'uppercase', letterSpacing: 0.5 }}>P.U. TTC</th>
                         <th style={{ padding: '10px 12px', fontSize: '9.5pt', fontWeight: 700, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 0.5 }}>Qté</th>
-                        <th style={{ padding: '10px 12px', fontSize: '9.5pt', fontWeight: 700, textAlign: 'right',  textTransform: 'uppercase', letterSpacing: 0.5 }}>Montant HT</th>
+                        <th style={{ padding: '10px 12px', fontSize: '9.5pt', fontWeight: 700, textAlign: 'right',  textTransform: 'uppercase', letterSpacing: 0.5 }}>Montant TTC</th>
                       </tr>
                     )}
                   </thead>
@@ -418,16 +427,16 @@ export const DocumentPreview = forwardRef<HTMLDivElement, DocumentPreviewProps>(
                             </td>
                             <td style={{ padding: '8px', fontSize: '9.5pt', textAlign: 'center', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}></td>
                             <td style={{ padding: '8px 12px', fontSize: '9.5pt', textAlign: 'center', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>
-                              {fmt2(getQt(ligne))}
+                              {fmtLoose(getQt(ligne))}
                             </td>
                             <td style={{ padding: '8px 12px', fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>
-                              {fmt2(getPrixVenteTtc(ligne))}
+                              {formatAmount(getPrixVenteTtc(ligne))}
                             </td>
                             <td style={{ padding: '8px', fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>
-                              {fmt2(getRemise(ligne))}
+                              {fmtLoose(getRemise(ligne))}
                             </td>
                             <td style={{ padding: '8px 12px', fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text, fontWeight: 700 }}>
-                              {fmt2(getPrixAchatTtc(ligne))}
+                              {formatAmount(getPrixAchatTtc(ligne))}
                             </td>
                           </tr>
                         )
@@ -441,13 +450,13 @@ export const DocumentPreview = forwardRef<HTMLDivElement, DocumentPreviewProps>(
                             {ligne.designation || '-'}
                           </td>
                           <td style={{ padding: '8px 12px', fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>
-                            {fmt4(getPu(ligne))} DH
+                            {formatAmount(getPuTtc(ligne))} DH
                           </td>
                           <td style={{ padding: '8px 12px', fontSize: '9.5pt', textAlign: 'center', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>
-                            {fmt2(getQt(ligne))}
+                            {fmtLoose(getQt(ligne))}
                           </td>
                           <td style={{ padding: '8px 12px', fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text, fontWeight: 700 }}>
-                            {fmt2(getMt(ligne))} DH
+                            {formatAmount(getMtTtc(ligne))} DH
                           </td>
                         </tr>
                       )
@@ -463,7 +472,7 @@ export const DocumentPreview = forwardRef<HTMLDivElement, DocumentPreviewProps>(
                 {/* ===== CARRY OVER ===== */}
                 {!page.isLast && pages.length > 1 && (
                   <div style={{ marginTop: 6, textAlign: 'right', fontSize: '9pt', borderTop: `1px dashed ${C.border}`, paddingTop: 6, color: C.text }}>
-                    <strong style={{ color: C.title }}>A reporter:</strong> {fmt2(page.carryTotal)} Dirhams DHS
+                    <strong style={{ color: C.title }}>A reporter:</strong> {formatAmount(page.carryTotal)} Dirhams DHS
                   </div>
                 )}
 
@@ -479,15 +488,15 @@ export const DocumentPreview = forwardRef<HTMLDivElement, DocumentPreviewProps>(
                         <tbody>
                           <tr>
                             <td style={{ padding: '8px 14px', textAlign: 'left',  background: C.rowAlt, borderBottom: `1px solid ${C.borderSoft}`, color: C.text }}>Total H.T</td>
-                            <td style={{ padding: '8px 14px', textAlign: 'right', background: C.rowAlt, borderBottom: `1px solid ${C.borderSoft}`, color: C.text, fontWeight: 700 }}>{fmt2(totalHt)} DH</td>
+                            <td style={{ padding: '8px 14px', textAlign: 'right', background: C.rowAlt, borderBottom: `1px solid ${C.borderSoft}`, color: C.text, fontWeight: 700 }}>{formatAmount(totalHt)} DH</td>
                           </tr>
                           <tr>
                             <td style={{ padding: '8px 14px', textAlign: 'left',  background: C.rowAlt, color: C.text }}>TVA{tvaBuckets.length === 1 ? ` (${tvaBuckets[0].rate}%)` : ''}</td>
-                            <td style={{ padding: '8px 14px', textAlign: 'right', background: C.rowAlt, color: C.text, fontWeight: 700 }}>{fmt2(totalTva)} DH</td>
+                            <td style={{ padding: '8px 14px', textAlign: 'right', background: C.rowAlt, color: C.text, fontWeight: 700 }}>{formatAmount(totalTva)} DH</td>
                           </tr>
                           <tr>
                             <td style={{ padding: '12px 14px', textAlign: 'left',  background: C.accent, color: '#fff', fontWeight: 700, fontSize: '11pt', letterSpacing: 0.5, textTransform: 'uppercase' }}>Total TTC</td>
-                            <td style={{ padding: '12px 14px', textAlign: 'right', background: C.accent, color: '#fff', fontWeight: 800, fontSize: '11pt' }}>{fmt2(totalTtc)} DH</td>
+                            <td style={{ padding: '12px 14px', textAlign: 'right', background: C.accent, color: '#fff', fontWeight: 800, fontSize: '11pt' }}>{formatAmount(totalTtc)} DH</td>
                           </tr>
                         </tbody>
                       </table>

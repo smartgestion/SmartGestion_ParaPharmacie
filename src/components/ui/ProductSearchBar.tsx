@@ -60,10 +60,19 @@ const MAX_RESULTS = 50;
 
 const getName = (p: SearchableProduit) => p.designation || p.nom || '';
 const getStock = (p: SearchableProduit) => Number(p.stock_actuel ?? p.stockActuel ?? 0);
-const getPrice = (p: SearchableProduit, field: 'vente' | 'achat') =>
-  field === 'achat'
-    ? Number(p.prix_achat_ht ?? p.prixAchatHt ?? p.prix_vente_ht ?? p.prixVenteHt ?? 0)
-    : Number(p.prix_vente_ht ?? p.prixVenteHt ?? p.prix_achat_ht ?? p.prixAchatHt ?? 0);
+// Prix affiché en TTC : préférer le TTC stocké, sinon dériver du HT via la TVA.
+const getPrice = (p: SearchableProduit, field: 'vente' | 'achat') => {
+  const tva = Number((p as any).taux_tva ?? (p as any).tauxTva ?? (p as any).tva ?? 20);
+  const toTtc = (ht: number) => ht * (1 + tva / 100);
+  if (field === 'achat') {
+    const ttc = Number((p as any).prix_achat_ttc ?? (p as any).prixAchatTtc ?? 0);
+    if (ttc > 0) return ttc;
+    return toTtc(Number(p.prix_achat_ht ?? p.prixAchatHt ?? p.prix_vente_ht ?? p.prixVenteHt ?? 0));
+  }
+  const ttc = Number((p as any).prix_vente_ttc ?? (p as any).prixVenteTtc ?? 0);
+  if (ttc > 0) return ttc;
+  return toTtc(Number(p.prix_vente_ht ?? p.prixVenteHt ?? p.prix_achat_ht ?? p.prixAchatHt ?? 0));
+};
 
 const ACCENT = {
   emerald: {

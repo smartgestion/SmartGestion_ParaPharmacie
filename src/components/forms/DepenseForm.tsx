@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, htToTtc, ttcToHt } from '@/lib/utils'
 import {
   Select,
   SelectContent,
@@ -41,7 +41,7 @@ export function DepenseForm({ initialData, onSuccess }: DepenseFormProps) {
     reference: z.string().optional(),
     categorie: z.string().min(1, t('shared.validation.category_required')),
     description: z.string().min(1, t('shared.validation.description_required')),
-    montantHt: z.coerce.number().min(0, t('shared.validation.amount_positive')),
+    montantTtc: z.coerce.number().min(0, t('shared.validation.amount_positive')),
     tva: z.coerce.number().min(0).max(100),
     dateDepense: z.string().min(1, t('shared.validation.date_required')),
     modePaiement: z.string().min(1, t('shared.validation.payment_mode_required')),
@@ -57,7 +57,7 @@ export function DepenseForm({ initialData, onSuccess }: DepenseFormProps) {
       reference: '',
       categorie: 'fournitures',
       description: '',
-      montantHt: 0,
+      montantTtc: 0,
       tva: 20,
       dateDepense: new Date().toISOString().split('T')[0],
       modePaiement: 'Virement',
@@ -85,7 +85,10 @@ export function DepenseForm({ initialData, onSuccess }: DepenseFormProps) {
             reference: initialData.reference || initialData.ref || '',
             fournisseurId: initialData.fournisseurId?.toString() || 'none',
             dateDepense: initialData.dateDepense || new Date().toISOString().split('T')[0],
-            montantHt: Number(initialData.montantHt || 0),
+            // Saisie en TTC ; dérivé du HT si le TTC stocké est absent.
+            montantTtc: Number(initialData.montantTtc || 0) > 0
+              ? Number(initialData.montantTtc)
+              : htToTtc(Number(initialData.montantHt || 0), Number(initialData.tva || 20)),
             tva: Number(initialData.tva || 20),
           });
         } else {
@@ -94,7 +97,7 @@ export function DepenseForm({ initialData, onSuccess }: DepenseFormProps) {
             reference: '',
             categorie: 'fournitures',
             description: '',
-            montantHt: 0,
+            montantTtc: 0,
             tva: 20,
             dateDepense: new Date().toISOString().split('T')[0],
             modePaiement: 'Virement',
@@ -130,10 +133,11 @@ export function DepenseForm({ initialData, onSuccess }: DepenseFormProps) {
 
   const onSubmit = async (data: DepenseFormValues) => {
     try {
-      const montantHt = Number(data.montantHt);
+      // Saisie en TTC ; le HT et la TVA sont dérivés (stockage inchangé).
+      const montantTtc = Number(data.montantTtc);
       const tva = Number(data.tva);
-      const montantTva = montantHt * (tva / 100);
-      const montantTtc = montantHt + montantTva;
+      const montantHt = ttcToHt(montantTtc, tva);
+      const montantTva = montantTtc - montantHt;
 
       let reference = data.reference?.trim() || null;
       if (!reference && !initialData?.id) {
@@ -261,10 +265,10 @@ export function DepenseForm({ initialData, onSuccess }: DepenseFormProps) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <FormField
                 control={form.control}
-                name="montantHt"
+                name="montantTtc"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-slate-700 font-semibold dark:text-slate-300">{t('shared.form.amount_ht')}</FormLabel>
+                    <FormLabel className="text-slate-700 font-semibold dark:text-slate-300">{t('shared.form.amount_ttc')}</FormLabel>
                     <FormControl>
                       <Input type="number" step="0.01" className="bg-white border-slate-300 font-mono dark:bg-slate-950/50 dark:border-white/10 dark:text-white" {...field} />
                     </FormControl>
@@ -287,9 +291,9 @@ export function DepenseForm({ initialData, onSuccess }: DepenseFormProps) {
               />
               <div className="flex flex-col justify-end pb-2">
                 <div className="bg-slate-100 p-2 rounded border border-slate-200 text-right dark:bg-slate-900/60 dark:border-white/10">
-                  <span className="text-xs text-slate-500 block uppercase font-bold dark:text-slate-400">{t('shared.form.estimated_ttc')}</span>
+                  <span className="text-xs text-slate-500 block uppercase font-bold dark:text-slate-400">{t('shared.form.estimated_ht')}</span>
                   <span className="text-lg font-bold text-slate-800 dark:text-white" dir="ltr">
-                    {formatCurrency(Number(form.watch('montantHt') || 0) * (1 + Number(form.watch('tva') || 0) / 100))}
+                    {formatCurrency(ttcToHt(Number(form.watch('montantTtc') || 0), Number(form.watch('tva') || 0)))}
                   </span>
                 </div>
               </div>

@@ -4,7 +4,8 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
 import { Plus, Trash2, Calculator } from 'lucide-react'
-import { formatCurrency } from '@/lib/utils'
+import { formatCurrency, htToTtc, ttcToHt } from '@/lib/utils'
+import { TtcPriceInput } from '@/components/ui/TtcPriceInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -265,7 +266,12 @@ export function DevisForm({ initialData, onSuccess }: DevisFormProps) {
       form.setValue(`lignes.${index}.produitId`, produit.id.toString());
       form.setValue(`lignes.${index}.reference`, produit.reference || '');
       form.setValue(`lignes.${index}.designation`, produit.designation || produit.nom || '');
-      form.setValue(`lignes.${index}.prixUnitaireHt`, Number(produit.prixVenteHt || produit.prix_vente_ht || 0));
+      // Prix affiché en TTC : préférer le TTC catalogue (conversion exacte),
+      // sinon retomber sur le HT stocké. Le champ de formulaire reste HT.
+      const prixVenteTtcProd = Number(produit.prixVenteTtc || produit.prix_vente_ttc || 0);
+      form.setValue(`lignes.${index}.prixUnitaireHt`, prixVenteTtcProd > 0
+        ? ttcToHt(prixVenteTtcProd, tva)
+        : Number(produit.prixVenteHt || produit.prix_vente_ht || 0));
       form.setValue(`lignes.${index}.tva`, tva);
       form.setValue(`lignes.${index}.remise`, calcRemise, { shouldDirty: true });
       form.setValue(`lignes.${index}.prixVenteTtc`, calcTtc, { shouldDirty: true });
@@ -388,16 +394,17 @@ export function DevisForm({ initialData, onSuccess }: DevisFormProps) {
                 <th className="p-3 text-start font-semibold dark:text-muted-foreground text-slate-600">{t('shared.table.product')}</th>
                 <th className="p-3 text-start font-semibold dark:text-muted-foreground text-slate-600">{t('shared.form.description_label')}</th>
                 <th className="p-3 text-right font-semibold dark:text-muted-foreground text-slate-600 w-24">{t('shared.form.qty_label')}</th>
-                <th className="p-3 text-right font-semibold dark:text-muted-foreground text-slate-600 w-32">{t('shared.form.price_ht_label')}</th>
+                <th className="p-3 text-right font-semibold dark:text-muted-foreground text-slate-600 w-32">{t('shared.form.price_ttc_label')}</th>
                 <th className="p-3 text-right font-semibold dark:text-muted-foreground text-slate-600 w-24">{t('shared.form.vat_pct_label')}</th>
-                <th className="p-3 text-right font-semibold dark:text-muted-foreground text-slate-600 w-32">{t('shared.form.subtotal_ht')}</th>
+                <th className="p-3 text-right font-semibold dark:text-muted-foreground text-slate-600 w-32">{t('shared.form.total_ttc')}</th>
                 <th className="p-3 w-24"></th>
               </tr>
             </thead>
             <tbody className="divide-y dark:divide-white/10 divide-slate-100">
               {fields.map((field, index) => {
                 const ligne = watchLignes[index];
-                const totalHt = (ligne?.quantite || 0) * (ligne?.prixUnitaireHt || 0);
+                // Total de ligne affiché en TTC (le HT reste la source stockée)
+                const totalTtc = htToTtc((ligne?.quantite || 0) * (ligne?.prixUnitaireHt || 0), ligne?.tva ?? 20);
                 const selectedProductId = form.watch(`lignes.${index}.produitId`);
                 const selectedProduct = selectedProductId ? produits.find(p2 => p2.id.toString() === selectedProductId) : null;
 
@@ -428,11 +435,11 @@ export function DevisForm({ initialData, onSuccess }: DevisFormProps) {
                       />
                     </td>
                     <td className="p-2">
-                      <Input
-                        type="number"
-                        step="0.01"
+                      <TtcPriceInput
                         className="h-9 text-right dark:bg-slate-950/50 dark:border-white/10 dark:focus:border-[#267E54] bg-white border-slate-200"
-                        {...form.register(`lignes.${index}.prixUnitaireHt`, { valueAsNumber: true })}
+                        htValue={ligne?.prixUnitaireHt || 0}
+                        tvaRate={ligne?.tva ?? 20}
+                        onHtChange={(ht) => form.setValue(`lignes.${index}.prixUnitaireHt`, ht, { shouldValidate: true, shouldDirty: true })}
                       />
                     </td>
                     <td className="p-2">
@@ -444,7 +451,7 @@ export function DevisForm({ initialData, onSuccess }: DevisFormProps) {
                       />
                     </td>
                     <td className="p-2 text-right font-semibold dark:text-card-foreground text-slate-700 align-middle">
-                      {formatCurrency(totalHt)}
+                      {formatCurrency(totalTtc)}
                     </td>
                     <td className="p-2 text-center align-middle">
                       <div className="flex items-center justify-center gap-1">

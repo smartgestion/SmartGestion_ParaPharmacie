@@ -1,6 +1,6 @@
 import { forwardRef, useMemo } from 'react'
 import { format, isValid, parseISO } from 'date-fns'
-import { getDateLocale } from '@/lib/utils'
+import { getDateLocale, formatAmount } from '@/lib/utils'
 import { numberToFrenchWords } from '@/lib/numberToWords'
 import { DOC_COLORS as C } from './docColors'
 
@@ -11,7 +11,9 @@ interface FactureDocumentProps {
   lang?: string
 }
 
-const fmt3 = (n: number): string =>
+// Prices use `formatAmount` (always 2 decimals). `fmtLoose` is kept for
+// non-money values (percentages / quantities) that must NOT force decimals.
+const fmtLoose = (n: number): string =>
   new Intl.NumberFormat('fr-FR', { style: 'decimal', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(n)
 
 const safeNum = (v: any, fallback = 0): number => {
@@ -299,13 +301,13 @@ export const FactureDocument = forwardRef<HTMLDivElement, FactureDocumentProps>(
                         {getQt(ligne)}
                       </td>
                       <td style={{ padding: `${rowPadY} 12px`, fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>
-                        {fmt3(getPrixVenteTtc(ligne))}
+                        {formatAmount(getPrixVenteTtc(ligne))}
                       </td>
                       <td style={{ padding: `${rowPadY} 8px`, fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text }}>
-                        {fmt3(getRemise(ligne))}
+                        {fmtLoose(getRemise(ligne))}
                       </td>
                       <td style={{ padding: `${rowPadY} 12px`, fontSize: '9.5pt', textAlign: 'right', borderBottom: `0.5pt solid ${C.borderSoft}`, color: C.text, fontWeight: 700 }}>
-                        {fmt3(getPrixAchatTtc(ligne))}
+                        {formatAmount(getPrixAchatTtc(ligne))}
                       </td>
                     </tr>
                   ))}
@@ -345,7 +347,7 @@ export const FactureDocument = forwardRef<HTMLDivElement, FactureDocumentProps>(
                         color: C.text,
                         fontWeight: 700,
                       }}>
-                        {fmt3(totalHt)} DH
+                        {formatAmount(totalHt)} DH
                       </td>
                     </tr>
                     <tr>
@@ -364,7 +366,7 @@ export const FactureDocument = forwardRef<HTMLDivElement, FactureDocumentProps>(
                         color: C.text,
                         fontWeight: 700,
                       }}>
-                        {fmt3(totalTva)} DH
+                        {formatAmount(totalTva)} DH
                       </td>
                     </tr>
                     <tr>
@@ -388,7 +390,7 @@ export const FactureDocument = forwardRef<HTMLDivElement, FactureDocumentProps>(
                         fontWeight: 800,
                         fontSize: '11pt',
                       }}>
-                        {fmt3(totalTtc)} DH
+                        {formatAmount(totalTtc)} DH
                       </td>
                     </tr>
                   </tbody>
