@@ -50,7 +50,8 @@ import {
   Crop,
   Receipt,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  CalendarClock
 } from 'lucide-react';
 import { TicketSettingsDialog } from '@/components/parametres/TicketSettingsDialog';
 import { getOfflineWindowStatus, OFFLINE_WINDOW_DAYS, type OfflineWindowStatus } from '@/lib/db/auth';
@@ -80,6 +81,11 @@ interface ParametresFormValues {
   activerDroitTimbre: boolean;
   watermarkText: string;
   activerFiligrane: boolean;
+  expirationDefaultAlertDays: number;
+  expirationAllowCustomAlert: boolean;
+  expirationIncludeInStock: boolean;
+  expirationPreventExpiredSale: boolean;
+  expirationWarnColors: boolean;
 }
 
 export function Parametres() {
@@ -91,11 +97,11 @@ export function Parametres() {
   const [parametresId, setParametresId] = useState<string | null>(null);
   const [isModified, setIsModified] = useState(false);
   const [activeTab, setActiveTab] = useState('general');
-  // Compte à rebours avant la déconnexion automatique (fenêtre 14 jours)
+  // Compte ï¿½ rebours avant la dï¿½connexion automatique (fenï¿½tre 14 jours)
   const [sessionWindow, setSessionWindow] = useState<OfflineWindowStatus>(() => getOfflineWindowStatus());
   useEffect(() => {
     setSessionWindow(getOfflineWindowStatus());
-    // Rafraîchir chaque minute tant que la page est ouverte
+    // Rafraï¿½chir chaque minute tant que la page est ouverte
     const id = setInterval(() => setSessionWindow(getOfflineWindowStatus()), 60 * 1000);
     return () => clearInterval(id);
   }, []);
@@ -107,10 +113,10 @@ export function Parametres() {
   const [logoError, setLogoError] = useState(false);
   /** Controls the ticket-customisation modal opened from the Apparence tab.
       Settings are persisted by the dialog itself in localStorage
-      (`pg_ticket_settings`) — no extra wiring needed here. */
+      (`pg_ticket_settings`) ï¿½ no extra wiring needed here. */
   const [ticketDialogOpen, setTicketDialogOpen] = useState(false);
   // Document accent colour (Factures / Devis / BC / BL / Avoirs). Persisted
-  // per-device in localStorage via docColors helpers — applied immediately.
+  // per-device in localStorage via docColors helpers ï¿½ applied immediately.
   const [docAccent, setDocAccent] = useState<string>(() => readDocAccent());
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [cropDialogOpen, setCropDialogOpen] = useState(false);
@@ -143,6 +149,11 @@ export function Parametres() {
     activerDroitTimbre: z.boolean(),
     watermarkText: z.string(),
     activerFiligrane: z.boolean(),
+    expirationDefaultAlertDays: z.number().min(0),
+    expirationAllowCustomAlert: z.boolean(),
+    expirationIncludeInStock: z.boolean(),
+    expirationPreventExpiredSale: z.boolean(),
+    expirationWarnColors: z.boolean(),
   });
   
   const form = useForm<ParametresFormValues>({
@@ -172,6 +183,11 @@ export function Parametres() {
       activerDroitTimbre: true,
       watermarkText: 'SmartGestion',
       activerFiligrane: true,
+      expirationDefaultAlertDays: 30,
+      expirationAllowCustomAlert: true,
+      expirationIncludeInStock: false,
+      expirationPreventExpiredSale: true,
+      expirationWarnColors: true,
     },
   });
 
@@ -181,6 +197,7 @@ export function Parametres() {
     general: ['nomSociete', 'adresse', 'ville', 'codePostal', 'telephone', 'email', 'siteWeb', 'formeJuridique', 'capitalSocial'].some(f => errors[f]),
     fiscal: ['ice', 'rc', 'ifNumber', 'tpPatente', 'cnss', 'banque', 'rib', 'swift'].some(f => errors[f]),
     personalisation: ['couleurPrincipale', 'logoUrl', 'conditionsPaiementDefaut', 'piedPageDefaut', 'watermarkText', 'activerFiligrane'].some(f => errors[f]),
+    expiration: ['expirationDefaultAlertDays'].some(f => errors[f]),
   }), [errors]);
 
   const STORAGE_KEY = 'sf_params_modified';
@@ -219,7 +236,7 @@ export function Parametres() {
         
         const { data, error } = await supabase
           .from('parametres')
-          .select('id,user_id,nom_societe,nom,adresse,ville,code_postale,telephone,email,site_web,ice,rc,if_number,tp_patente,cnss,capital_social,forme_juridique,logo_url,couleur_principale,banque,rib,swift,devise,conditions_paiement_defaut,pied_page_defaut,activer_droit_timbre,activer_filigrane,texte_filigrane,watermark_text,created_at,updated_at')
+          .select('id,user_id,nom_societe,nom,adresse,ville,code_postale,telephone,email,site_web,ice,rc,if_number,tp_patente,cnss,capital_social,forme_juridique,logo_url,couleur_principale,banque,rib,swift,devise,conditions_paiement_defaut,pied_page_defaut,activer_droit_timbre,activer_filigrane,texte_filigrane,watermark_text,expiration_default_alert_days,expiration_allow_custom_alert,expiration_include_in_stock,expiration_prevent_expired_sale,expiration_warn_colors,created_at,updated_at')
           .eq('user_id', user.id)
           .maybeSingle();
         
@@ -254,6 +271,11 @@ export function Parametres() {
             activerDroitTimbre: data.activer_droit_timbre !== undefined ? Boolean(data.activer_droit_timbre) : true,
             watermarkText: data.watermark_text || data.texte_filigrane || 'SmartGestion',
             activerFiligrane: data.activer_filigrane !== undefined ? Boolean(data.activer_filigrane) : true,
+            expirationDefaultAlertDays: data.expiration_default_alert_days != null ? Number(data.expiration_default_alert_days) : 30,
+            expirationAllowCustomAlert: data.expiration_allow_custom_alert !== undefined ? Boolean(data.expiration_allow_custom_alert) : true,
+            expirationIncludeInStock: data.expiration_include_in_stock !== undefined ? Boolean(data.expiration_include_in_stock) : false,
+            expirationPreventExpiredSale: data.expiration_prevent_expired_sale !== undefined ? Boolean(data.expiration_prevent_expired_sale) : true,
+            expirationWarnColors: data.expiration_warn_colors !== undefined ? Boolean(data.expiration_warn_colors) : true,
           };
           form.reset(mapped);
           localStorage.setItem(CACHED_PARAMS_KEY, JSON.stringify(mapped));
@@ -358,6 +380,11 @@ export function Parametres() {
         activer_filigrane: data.activerFiligrane,
         texte_filigrane: data.watermarkText,
         watermark_text: data.watermarkText,
+        expiration_default_alert_days: data.expirationDefaultAlertDays,
+        expiration_allow_custom_alert: data.expirationAllowCustomAlert,
+        expiration_include_in_stock: data.expirationIncludeInStock,
+        expiration_prevent_expired_sale: data.expirationPreventExpiredSale,
+        expiration_warn_colors: data.expirationWarnColors,
       };
 
       localStorage.setItem('pg_watermark', JSON.stringify(data.activerFiligrane));
@@ -371,7 +398,7 @@ export function Parametres() {
           .from('parametres')
           .update(fields)
           .eq('id', parametresId)
-          .select('id,user_id,nom_societe,nom,adresse,ville,code_postale,telephone,email,site_web,ice,rc,if_number,tp_patente,cnss,capital_social,forme_juridique,logo_url,couleur_principale,banque,rib,swift,devise,conditions_paiement_defaut,pied_page_defaut,activer_droit_timbre,activer_filigrane,texte_filigrane,watermark_text,created_at,updated_at')
+          .select('id,user_id,nom_societe,nom,adresse,ville,code_postale,telephone,email,site_web,ice,rc,if_number,tp_patente,cnss,capital_social,forme_juridique,logo_url,couleur_principale,banque,rib,swift,devise,conditions_paiement_defaut,pied_page_defaut,activer_droit_timbre,activer_filigrane,texte_filigrane,watermark_text,expiration_default_alert_days,expiration_allow_custom_alert,expiration_include_in_stock,expiration_prevent_expired_sale,expiration_warn_colors,created_at,updated_at')
           .maybeSingle();
         result = response.data;
         error = response.error;
@@ -379,7 +406,7 @@ export function Parametres() {
         const response = await supabase
           .from('parametres')
           .insert([{ ...fields, user_id: user.id }])
-          .select('id,user_id,nom_societe,nom,adresse,ville,code_postale,telephone,email,site_web,ice,rc,if_number,tp_patente,cnss,capital_social,forme_juridique,logo_url,couleur_principale,banque,rib,swift,devise,conditions_paiement_defaut,pied_page_defaut,activer_droit_timbre,activer_filigrane,texte_filigrane,watermark_text,created_at,updated_at')
+          .select('id,user_id,nom_societe,nom,adresse,ville,code_postale,telephone,email,site_web,ice,rc,if_number,tp_patente,cnss,capital_social,forme_juridique,logo_url,couleur_principale,banque,rib,swift,devise,conditions_paiement_defaut,pied_page_defaut,activer_droit_timbre,activer_filigrane,texte_filigrane,watermark_text,expiration_default_alert_days,expiration_allow_custom_alert,expiration_include_in_stock,expiration_prevent_expired_sale,expiration_warn_colors,created_at,updated_at')
           .maybeSingle();
         result = response.data;
         error = response.error;
@@ -474,7 +501,7 @@ export function Parametres() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="space-y-6">
-          {/* Navigation Cards — responsive
+          {/* Navigation Cards ï¿½ responsive
               -------------------------------------------------------------
               Mobile (<sm): single column stack, tighter padding, the chevron
               hides since the active state is now visually clear with the
@@ -535,6 +562,24 @@ export function Parametres() {
               <div className="flex-1 min-w-0 sm:hidden md:block">
                 <p className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base">{t('parametres.nav_appearance')}</p>
                 <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 truncate">{t('parametres.nav_appearance_sub')}</p>
+              </div>
+              <ChevronRight className="hidden md:block h-5 w-5 text-slate-300 dark:text-slate-600 shrink-0 rtl:rotate-180" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('expiration')}
+              className={`flex items-center gap-3 sm:gap-4 p-3 sm:p-5 rounded-2xl border text-start w-full bg-white border-slate-200 dark:bg-[#0b1222] dark:border-white/5 ${
+                activeTab === 'expiration' ? 'ring-2 ring-primary/20 border-primary bg-slate-50 dark:border-primary/50 dark:bg-slate-800/50' : ''
+              }`}
+            >
+              <div className="relative flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-slate-100 dark:bg-slate-800/50 shrink-0">
+                <CalendarClock className="h-5 w-5 sm:h-6 sm:w-6 text-teal-500 dark:text-teal-400" />
+                {tabErrors.expiration && <span className="absolute top-0 end-0 w-2.5 h-2.5 bg-red-500 rounded-full ring-2 ring-white dark:ring-[#0b1222]" />}
+              </div>
+              <div className="flex-1 min-w-0 sm:hidden md:block">
+                <p className="font-semibold text-slate-900 dark:text-white text-sm sm:text-base">{t('parametres.nav_expiration', 'PÃ©remption')}</p>
+                <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 truncate">{t('parametres.nav_expiration_sub', 'Alertes et FEFO')}</p>
               </div>
               <ChevronRight className="hidden md:block h-5 w-5 text-slate-300 dark:text-slate-600 shrink-0 rtl:rotate-180" />
             </button>
@@ -701,7 +746,7 @@ export function Parametres() {
                 </CardContent>
               </Card>
 
-              {/* Session — compte à rebours avant déconnexion automatique */}
+              {/* Session ï¿½ compte ï¿½ rebours avant dï¿½connexion automatique */}
               <Card className="mt-6 border border-slate-100 rounded-2xl dark:bg-[#0b1222] dark:border-white/5">
                 <CardHeader className="border-b border-slate-100 px-4 sm:px-6 py-4 sm:py-5 dark:border-white/5">
                   <div className="flex items-center gap-3">
@@ -713,7 +758,7 @@ export function Parametres() {
                         {t('parametres.session.title', 'Session')}
                       </CardTitle>
                       <CardDescription className="text-xs text-muted-foreground dark:text-slate-400">
-                        {t('parametres.session.subtitle', 'Déconnexion automatique après {{days}} jours', { days: OFFLINE_WINDOW_DAYS })}
+                        {t('parametres.session.subtitle', 'Dï¿½connexion automatique aprï¿½s {{days}} jours', { days: OFFLINE_WINDOW_DAYS })}
                       </CardDescription>
                     </div>
                   </div>
@@ -723,7 +768,7 @@ export function Parametres() {
                     <div className="flex items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50 px-4 py-4 dark:border-white/5 dark:bg-slate-800/30">
                       <div>
                         <p className="text-sm font-semibold text-foreground dark:text-slate-200">
-                          {t('parametres.session.remaining_label', 'Temps restant avant déconnexion')}
+                          {t('parametres.session.remaining_label', 'Temps restant avant dï¿½connexion')}
                         </p>
                         {sessionWindow.expiresAt && (
                           <p className="text-xs text-muted-foreground dark:text-slate-400 mt-0.5">
@@ -1359,6 +1404,107 @@ export function Parametres() {
                 </CardContent>
               </Card>
             </TabsContent>
+
+            <TabsContent value="expiration" className="mt-0 space-y-6">
+              <Card className="border border-slate-100 rounded-2xl dark:bg-[#0b1222] dark:border-white/5">
+                <CardHeader className="border-b border-slate-100 px-4 sm:px-6 py-4 sm:py-5 dark:border-white/5">
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-center h-10 w-10 rounded-xl bg-slate-100 dark:bg-slate-800/50">
+                      <CalendarClock className="h-5 w-5 text-teal-500 dark:text-teal-400" />
+                    </div>
+                    <div>
+                      <CardTitle className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t('parametres.expiration.title', 'ParamÃ¨tres de pÃ©remption')}</CardTitle>
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{t('parametres.expiration.subtitle', 'Gestion des lots et alertes FEFO')}</p>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6 space-y-4">
+                  <FormField
+                    control={form.control}
+                    name="expirationDefaultAlertDays"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-foreground font-semibold">{t('parametres.expiration.default_alert', "Alerte par dÃ©faut avant pÃ©remption (jours)")}</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min={0}
+                            className="h-11 bg-white border-border/50 focus:border-primary dark:bg-[#020617]/50 dark:border-white/10 dark:text-white max-w-[200px]"
+                            value={field.value}
+                            onChange={(e) => field.onChange(Number(e.target.value))}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="expirationAllowCustomAlert"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50/30 dark:border-white/5 dark:bg-[#0b1222]">
+                        <div className="space-y-0.5 flex-1">
+                          <FormLabel className="text-base font-semibold cursor-pointer">{t('parametres.expiration.allow_custom', 'Autoriser une alerte personnalisÃ©e par lot')}</FormLabel>
+                          <p className="text-sm text-muted-foreground">{t('parametres.expiration.allow_custom_desc', 'Chaque lot peut dÃ©finir son propre dÃ©lai dâ€™alerte.')}</p>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-primary" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="expirationIncludeInStock"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50/30 dark:border-white/5 dark:bg-[#0b1222]">
+                        <div className="space-y-0.5 flex-1">
+                          <FormLabel className="text-base font-semibold cursor-pointer">{t('parametres.expiration.include_expired', 'Inclure les lots pÃ©rimÃ©s dans le stock')}</FormLabel>
+                          <p className="text-sm text-muted-foreground">{t('parametres.expiration.include_expired_desc', 'Le stock affichÃ© comptabilisera les lots pÃ©rimÃ©s.')}</p>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-primary" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="expirationPreventExpiredSale"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50/30 dark:border-white/5 dark:bg-[#0b1222]">
+                        <div className="space-y-0.5 flex-1">
+                          <FormLabel className="text-base font-semibold cursor-pointer">{t('parametres.expiration.prevent_sale', 'EmpÃªcher la vente de lots pÃ©rimÃ©s')}</FormLabel>
+                          <p className="text-sm text-muted-foreground">{t('parametres.expiration.prevent_sale_desc', 'RecommandÃ©. Bloque les ventes si le stock non pÃ©rimÃ© est insuffisant.')}</p>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-primary" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+
+                  <FormField
+                    control={form.control}
+                    name="expirationWarnColors"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between p-4 rounded-xl border border-slate-200 bg-slate-50/30 dark:border-white/5 dark:bg-[#0b1222]">
+                        <div className="space-y-0.5 flex-1">
+                          <FormLabel className="text-base font-semibold cursor-pointer">{t('parametres.expiration.warn_colors', 'Couleurs dâ€™avertissement du tableau de bord')}</FormLabel>
+                          <p className="text-sm text-muted-foreground">{t('parametres.expiration.warn_colors_desc', 'Vert &gt; 90j, jaune 31â€“90j, orange 1â€“30j, rouge pÃ©rimÃ©.')}</p>
+                        </div>
+                        <FormControl>
+                          <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-primary" />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
           </div>
 
@@ -1384,7 +1530,7 @@ export function Parametres() {
         </form>
       </Form>
 
-      {/* Ticket settings modal — portalled, position in the tree
+      {/* Ticket settings modal ï¿½ portalled, position in the tree
           is purely organisational. Triggered from the Apparence tab. */}
       <TicketSettingsDialog open={ticketDialogOpen} onOpenChange={setTicketDialogOpen} />
     </div>

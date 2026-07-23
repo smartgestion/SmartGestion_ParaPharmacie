@@ -81,6 +81,7 @@ export const RELATIONS: RelationMap = {
     bon_commande_lignes: { kind: 'hasMany',   fkColumn: 'bon_commande_id' },
     bons_livraison:      { kind: 'hasMany',   fkColumn: 'bon_commande_id' },
     avoirs_fournisseur:  { kind: 'hasMany',   fkColumn: 'bon_commande_id' },
+    product_batches:     { kind: 'hasMany',   fkColumn: 'bon_commande_id' },
   },
   bon_commande_lignes: {
     bons_commande: { kind: 'belongsTo', fkColumn: 'bon_commande_id' },
@@ -138,6 +139,13 @@ export const RELATIONS: RelationMap = {
     produits: { kind: 'belongsTo', fkColumn: 'produit_id' },
   },
 
+  // -------------------- product batches (lots / FEFO) ------------------
+  product_batches: {
+    produits:      { kind: 'belongsTo', fkColumn: 'produit_id' },
+    bons_commande: { kind: 'belongsTo', fkColumn: 'bon_commande_id' },
+    fournisseurs:  { kind: 'belongsTo', fkColumn: 'supplier_id' },
+  },
+
   // -------------------- reverse lookups from the master tables --------
   clients: {
     factures:              { kind: 'hasMany', fkColumn: 'client_id' },
@@ -161,6 +169,7 @@ export const RELATIONS: RelationMap = {
     bon_livraison_client_lignes: { kind: 'hasMany', fkColumn: 'produit_id' },
     ventes_passagers_lignes: { kind: 'hasMany', fkColumn: 'produit_id' },
     mouvements_stock:        { kind: 'hasMany', fkColumn: 'produit_id' },
+    product_batches:         { kind: 'hasMany', fkColumn: 'produit_id' },
   },
 };
 
@@ -291,7 +300,9 @@ export async function stitchEmbedded(ctx: StitchContext): Promise<Row[]> {
         for (const r of ctx.parentRows) r[spec.alias] = null;
         continue;
       }
-      const cols = renderEmbeddedColumns(spec.columns);
+      // Always fetch the pk column so we can index the child rows, even when
+      // the caller requested a subset of columns (e.g. `produits(designation)`).
+      const cols = renderEmbeddedColumns(spec.columns, pkCol);
       const sql = `SELECT ${cols} FROM ${quoteIdent(spec.table)} WHERE ${quoteIdent(
         pkCol,
       )} IN (${fkValues.map(() => '?').join(', ')})`;
@@ -314,7 +325,8 @@ export async function stitchEmbedded(ctx: StitchContext): Promise<Row[]> {
         for (const r of ctx.parentRows) r[spec.alias] = [];
         continue;
       }
-      const cols = renderEmbeddedColumns(spec.columns);
+      // Always fetch the FK column so we can group child rows by parent.
+      const cols = renderEmbeddedColumns(spec.columns, def.fkColumn);
       const sql = `SELECT ${cols} FROM ${quoteIdent(spec.table)} WHERE ${quoteIdent(
         def.fkColumn,
       )} IN (${parentIds.map(() => '?').join(', ')})`;
@@ -335,9 +347,11 @@ export async function stitchEmbedded(ctx: StitchContext): Promise<Row[]> {
   return ctx.parentRows;
 }
 
-function renderEmbeddedColumns(cols: string[]): string {
+function renderEmbeddedColumns(cols: string[], requiredCol?: string): string {
   if (cols.length === 1 && cols[0] === '*') return '*';
-  return cols.map((c) => quoteIdent(c)).join(', ');
+  const set = new Set(cols);
+  if (requiredCol) set.add(requiredCol);
+  return Array.from(set).map((c) => quoteIdent(c)).join(', ');
 }
 
 function uniq<T>(arr: T[]): T[] {

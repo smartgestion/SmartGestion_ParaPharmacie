@@ -22,7 +22,8 @@ import { formatCurrency, htToTtc, ttcToHt } from '@/lib/utils'
 import { TtcPriceInput } from '@/components/ui/TtcPriceInput'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { updateStockAndNotify, ensureLowStockNotifications } from '@/lib/notifications'
+import { ensureLowStockNotifications, sellStockFEFO } from '@/lib/notifications'
+import { validateFEFOAvailability } from '@/lib/batches'
 
 interface FactureFormProps {
   initialData?: any;
@@ -364,10 +365,35 @@ export function FactureForm({ initialData, onSuccess }: FactureFormProps) {
 
       const activeStatuses = ['payée', 'reste_a_payer'];
       if (activeStatuses.includes(data.statut)) {
+        // Block if non-expired batch stock can't cover the invoice (FEFO).
+        const problems = await validateFEFOAvailability(
+          user?.id,
+          lignesPayload
+            .filter((l: any) => l.produit_id)
+            .map((l: any) => ({ produitId: l.produit_id, quantity: Number(l.quantite), designation: l.designation })),
+        );
+        if (problems.length > 0) {
+          const p = problems[0];
+          toast.error(
+            t('lots.toast_insufficient_stock', {
+              product: p.designation || `#${p.produitId}`,
+              available: p.available,
+              requested: p.requested,
+              defaultValue: `Stock non périmé insuffisant pour ${p.designation || p.produitId} (disponible: ${p.available}, demandé: ${p.requested}).`,
+            }),
+          );
+          setIsLoading(false);
+          return;
+        }
+
         const changedIds: (number | string)[] = [];
         for (const ligne of lignesPayload) {
           if (ligne.produit_id) {
-            await updateStockAndNotify(user?.id, ligne.produit_id, -Number(ligne.quantite));
+            await sellStockFEFO(user?.id, ligne.produit_id, Number(ligne.quantite), {
+              referenceDocument: payload.numero,
+              type: 'vente',
+              notes: `Vente Facture ${payload.numero ?? ''}`,
+            });
             changedIds.push(ligne.produit_id);
           }
         }

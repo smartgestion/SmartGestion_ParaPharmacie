@@ -483,9 +483,36 @@ pub const MIGRATIONS: &[&str] = &[
         reference_document  TEXT,
         entite_nom          TEXT,
         prix_unitaire       REAL    DEFAULT 0,
+        batch_id            INTEGER,
         date_mouvement      TEXT    DEFAULT CURRENT_TIMESTAMP,
         created_at          TEXT    DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY (produit_id) REFERENCES produits(id)
+    );
+    "#,
+
+    // -----------------------------------------------------------------
+    // Product batches (Lots) — FEFO expiration management
+    // -----------------------------------------------------------------
+    r#"
+    CREATE TABLE IF NOT EXISTS product_batches (
+        id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id             TEXT,
+        produit_id          INTEGER,
+        bon_commande_id     INTEGER,
+        supplier_id         INTEGER,
+        lot_number          TEXT,
+        quantity_initial    REAL    DEFAULT 0,
+        quantity_remaining  REAL    DEFAULT 0,
+        purchase_price      REAL    DEFAULT 0,
+        received_date       TEXT    DEFAULT CURRENT_DATE,
+        expiration_date     TEXT,
+        alert_before_days   INTEGER DEFAULT 30,
+        status              TEXT    DEFAULT 'Active',
+        created_at          TEXT    DEFAULT CURRENT_TIMESTAMP,
+        updated_at          TEXT    DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (produit_id)      REFERENCES produits(id),
+        FOREIGN KEY (bon_commande_id) REFERENCES bons_commande(id),
+        FOREIGN KEY (supplier_id)     REFERENCES fournisseurs(id)
     );
     "#,
 
@@ -761,6 +788,10 @@ pub const MIGRATIONS: &[&str] = &[
     "CREATE INDEX IF NOT EXISTS idx_depenses_fournisseur        ON depenses(fournisseur_id);",
     "CREATE INDEX IF NOT EXISTS idx_vp_lignes_vp_id             ON ventes_passagers_lignes(vente_passager_id);",
     "CREATE INDEX IF NOT EXISTS idx_mouvements_stock_produit    ON mouvements_stock(produit_id);",
+    "CREATE INDEX IF NOT EXISTS idx_product_batches_user        ON product_batches(user_id);",
+    "CREATE INDEX IF NOT EXISTS idx_product_batches_produit     ON product_batches(produit_id);",
+    "CREATE INDEX IF NOT EXISTS idx_product_batches_bc          ON product_batches(bon_commande_id);",
+    "CREATE INDEX IF NOT EXISTS idx_product_batches_expiration  ON product_batches(expiration_date);",
     "CREATE INDEX IF NOT EXISTS idx_notifications_user_id       ON notifications(user_id);",
     "CREATE INDEX IF NOT EXISTS idx_produits_reference          ON produits(reference);",
     "CREATE INDEX IF NOT EXISTS idx_produits_barcode            ON produits(barcode);",
@@ -794,6 +825,16 @@ pub const ADDITIVE_COLUMNS: &[&str] = &[
     "ALTER TABLE bons_commande ADD COLUMN motif_annulation TEXT;",
     // Local filesystem path of a downloaded product image (NULL until fetched).
     "ALTER TABLE produits ADD COLUMN image_local TEXT;",
+    // Batch (Lot) & expiration management (FEFO)
+    "ALTER TABLE bon_commande_lignes ADD COLUMN numero_lot TEXT;",
+    "ALTER TABLE bon_commande_lignes ADD COLUMN date_peremption TEXT;",
+    "ALTER TABLE bon_commande_lignes ADD COLUMN alert_before_days INTEGER DEFAULT 30;",
+    "ALTER TABLE mouvements_stock ADD COLUMN batch_id INTEGER;",
+    "ALTER TABLE parametres ADD COLUMN expiration_default_alert_days INTEGER DEFAULT 30;",
+    "ALTER TABLE parametres ADD COLUMN expiration_allow_custom_alert INTEGER DEFAULT 1;",
+    "ALTER TABLE parametres ADD COLUMN expiration_include_in_stock INTEGER DEFAULT 0;",
+    "ALTER TABLE parametres ADD COLUMN expiration_prevent_expired_sale INTEGER DEFAULT 1;",
+    "ALTER TABLE parametres ADD COLUMN expiration_warn_colors INTEGER DEFAULT 1;",
 ];
 
 /// Current schema version (bump when adding migrations).
@@ -804,4 +845,8 @@ pub const ADDITIVE_COLUMNS: &[&str] = &[
 ///        (portefeuille_folders / _files / _papers).
 ///   v4 — adds the reference catalogue (catalog_products + catalog_fts FTS5
 ///        + sync triggers), the image_download_queue, and produits.image_local.
-pub const SCHEMA_VERSION: i64 = 4;
+///   v5 — adds the Batch (Lot) & expiration management system: product_batches
+///        table (FEFO), bon_commande_lignes.numero_lot/date_peremption/
+///        alert_before_days, mouvements_stock.batch_id, and expiration_* settings
+///        columns on parametres.
+pub const SCHEMA_VERSION: i64 = 5;

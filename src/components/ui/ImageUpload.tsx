@@ -759,9 +759,15 @@ export function ImageUpload({
       ) : preview ? (
         <div className="relative rounded-[6px] overflow-hidden border-2 border-slate-200 bg-slate-50/50">
           <img
+            key={preview}
             src={preview}
             alt="Preview"
             className="w-full max-h-64 object-contain"
+            onLoad={(e) => {
+              // A previous src may have failed and been hidden imperatively;
+              // when a new (working) src loads, make sure it's visible again.
+              (e.target as HTMLImageElement).style.display = '';
+            }}
             onError={(e) => {
               console.error('Image preview error');
               (e.target as HTMLImageElement).style.display = 'none';

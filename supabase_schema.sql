@@ -185,6 +185,10 @@ CREATE TABLE IF NOT EXISTS bon_commande_lignes (
 -- Migration pour les bases existantes
 ALTER TABLE bon_commande_lignes ADD COLUMN IF NOT EXISTS remise DECIMAL(5, 2) DEFAULT 0;
 ALTER TABLE bon_commande_lignes ADD COLUMN IF NOT EXISTS prix_vente_ttc DECIMAL(15, 2) DEFAULT 0;
+-- Batch / expiration capture on receipt (per line)
+ALTER TABLE bon_commande_lignes ADD COLUMN IF NOT EXISTS numero_lot TEXT;
+ALTER TABLE bon_commande_lignes ADD COLUMN IF NOT EXISTS date_peremption DATE;
+ALTER TABLE bon_commande_lignes ADD COLUMN IF NOT EXISTS alert_before_days INTEGER DEFAULT 30;
 
 -- Table: Bons de Livraison
 CREATE TABLE IF NOT EXISTS bons_livraison (
@@ -377,8 +381,36 @@ CREATE TABLE IF NOT EXISTS mouvements_stock (
     date_mouvement TIMESTAMPTZ DEFAULT NOW(),
     reference_document TEXT,
     notes TEXT,
+    batch_id BIGINT,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
+ALTER TABLE mouvements_stock ADD COLUMN IF NOT EXISTS batch_id BIGINT;
+
+-- Table: Product Batches (Lots) — FEFO expiration management
+-- A product can be received multiple times with different expiration dates.
+-- Expiration data lives ONLY here, never on the product. Product stock is the
+-- sum of all active batch remaining quantities.
+CREATE TABLE IF NOT EXISTS product_batches (
+    id BIGSERIAL PRIMARY KEY,
+    user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE,
+    produit_id BIGINT REFERENCES produits(id) ON DELETE CASCADE,
+    bon_commande_id BIGINT REFERENCES bons_commande(id) ON DELETE SET NULL,
+    supplier_id BIGINT REFERENCES fournisseurs(id) ON DELETE SET NULL,
+    lot_number TEXT,
+    quantity_initial DECIMAL(15, 2) DEFAULT 0,
+    quantity_remaining DECIMAL(15, 2) DEFAULT 0,
+    purchase_price DECIMAL(15, 2) DEFAULT 0,
+    received_date DATE DEFAULT CURRENT_DATE,
+    expiration_date DATE,
+    alert_before_days INTEGER DEFAULT 30,
+    status TEXT DEFAULT 'Active', -- Active | Expired | Empty
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS product_batches_user_id_idx        ON product_batches (user_id);
+CREATE INDEX IF NOT EXISTS product_batches_produit_id_idx     ON product_batches (produit_id);
+CREATE INDEX IF NOT EXISTS product_batches_bon_commande_idx   ON product_batches (bon_commande_id);
+CREATE INDEX IF NOT EXISTS product_batches_expiration_idx     ON product_batches (expiration_date);
 
 -- Table: Logs Activités
 CREATE TABLE IF NOT EXISTS logs_activites (
@@ -417,9 +449,20 @@ CREATE TABLE IF NOT EXISTS parametres (
     pied_page_defaut TEXT,
     activer_droit_timbre BOOLEAN DEFAULT TRUE,
     watermark_text TEXT DEFAULT 'SmartGestion',
+    expiration_default_alert_days INTEGER DEFAULT 30,
+    expiration_allow_custom_alert BOOLEAN DEFAULT TRUE,
+    expiration_include_in_stock BOOLEAN DEFAULT FALSE,
+    expiration_prevent_expired_sale BOOLEAN DEFAULT TRUE,
+    expiration_warn_colors BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMPTZ DEFAULT NOW(),
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+-- Migration for existing databases: expiration settings
+ALTER TABLE parametres ADD COLUMN IF NOT EXISTS expiration_default_alert_days INTEGER DEFAULT 30;
+ALTER TABLE parametres ADD COLUMN IF NOT EXISTS expiration_allow_custom_alert BOOLEAN DEFAULT TRUE;
+ALTER TABLE parametres ADD COLUMN IF NOT EXISTS expiration_include_in_stock BOOLEAN DEFAULT FALSE;
+ALTER TABLE parametres ADD COLUMN IF NOT EXISTS expiration_prevent_expired_sale BOOLEAN DEFAULT TRUE;
+ALTER TABLE parametres ADD COLUMN IF NOT EXISTS expiration_warn_colors BOOLEAN DEFAULT TRUE;
 
 -- Create indexes for user_id on all tables
 DO $$
@@ -430,7 +473,7 @@ BEGIN
     FOR t IN 
         SELECT table_name FROM information_schema.tables 
         WHERE table_schema = 'public' 
-        AND table_name IN ('produits', 'clients', 'fournisseurs', 'devis', 'factures', 'bons_commande', 'bons_livraison', 'bons_livraison_client', 'ventes_passagers', 'depenses', 'avoirs', 'avoirs_fournisseur', 'parametres')
+        AND table_name IN ('produits', 'clients', 'fournisseurs', 'devis', 'factures', 'bons_commande', 'bons_livraison', 'bons_livraison_client', 'ventes_passagers', 'depenses', 'avoirs', 'avoirs_fournisseur', 'parametres', 'product_batches')
     LOOP
         EXECUTE format('CREATE INDEX IF NOT EXISTS %I_user_id_idx ON %I (user_id)', t, t);
     END LOOP;
@@ -444,7 +487,7 @@ BEGIN
     FOR t IN 
         SELECT table_name FROM information_schema.tables 
         WHERE table_schema = 'public' 
-        AND table_name IN ('produits', 'clients', 'fournisseurs', 'devis', 'factures', 'bons_commande', 'bons_livraison', 'bons_livraison_client', 'ventes_passagers', 'depenses', 'avoirs', 'avoirs_fournisseur', 'parametres')
+        AND table_name IN ('produits', 'clients', 'fournisseurs', 'devis', 'factures', 'bons_commande', 'bons_livraison', 'bons_livraison_client', 'ventes_passagers', 'depenses', 'avoirs', 'avoirs_fournisseur', 'parametres', 'product_batches')
     LOOP
         EXECUTE format('DROP TRIGGER IF EXISTS update_%I_updated_at ON %I', t, t);
         EXECUTE format('CREATE TRIGGER update_%I_updated_at BEFORE UPDATE ON %I FOR EACH ROW EXECUTE FUNCTION update_updated_at_column()', t, t);

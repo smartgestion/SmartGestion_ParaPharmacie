@@ -41,7 +41,8 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { updateStockAndNotify, ensureLowStockNotifications } from '@/lib/notifications'
+import { ensureLowStockNotifications, sellStockFEFO, restoreStockForDocument } from '@/lib/notifications'
+import { validateFEFOAvailability } from '@/lib/batches'
 
 interface Facture {
   id: number;
@@ -603,7 +604,7 @@ export function FacturesList() {
       // deducted must put the sold quantities back into stock.
       const { data: current } = await supabase
         .from('factures')
-        .select('statut, stock_updated')
+        .select('statut, stock_updated, numero')
         .eq('id', facture.id)
         .single();
 
@@ -620,13 +621,8 @@ export function FacturesList() {
           .select('produit_id, quantite')
           .eq('facture_id', facture.id);
 
-        if (lignes) {
-          for (const l of lignes) {
-            if (l.produit_id) {
-              await updateStockAndNotify(user?.id, l.produit_id, Number(l.quantite));
-            }
-          }
-        }
+        // Restore quantities to their original batches (FEFO reverse).
+        await restoreStockForDocument(user?.id, current?.numero, lignes || []);
         updateData.stock_updated = false;
       }
 
@@ -699,7 +695,7 @@ export function FacturesList() {
 
   const handleStatusChange = async (id: number, newStatut: string) => {
     try {
-      const { data: facture } = await supabase.from('factures').select('statut, stock_updated').eq('id', id).single();
+      const { data: facture } = await supabase.from('factures').select('statut, stock_updated, numero').eq('id', id).single();
 
       if (facture?.statut === 'annulée' && newStatut !== 'annulée') {
         const { data: avoir } = await supabase.from('avoirs').select('id').eq('facture_id', id).single();
@@ -730,13 +726,38 @@ export function FacturesList() {
       if (isActive && !wasActive && !stockUpdated) {
         const { data: lignes } = await supabase
           .from('facture_lignes')
-          .select('produit_id, quantite')
+          .select('produit_id, quantite, designation')
           .eq('facture_id', id);
+
+        // Block activation if non-expired batch stock can't cover the invoice.
+        const problems = await validateFEFOAvailability(
+          user?.id,
+          (lignes || [])
+            .filter((l: any) => l.produit_id)
+            .map((l: any) => ({ produitId: l.produit_id, quantity: Number(l.quantite), designation: l.designation })),
+        );
+        if (problems.length > 0) {
+          const p = problems[0];
+          toast.error(
+            t('lots.toast_insufficient_stock', {
+              product: p.designation || `#${p.produitId}`,
+              available: p.available,
+              requested: p.requested,
+              defaultValue: `Stock non périmé insuffisant pour ${p.designation || p.produitId} (disponible: ${p.available}, demandé: ${p.requested}).`,
+            }),
+          );
+          return;
+        }
 
         if (lignes) {
           for (const l of lignes) {
             if (l.produit_id) {
-              await updateStockAndNotify(user?.id, l.produit_id, -Number(l.quantite));
+              await sellStockFEFO(user?.id, l.produit_id, Number(l.quantite), {
+                referenceDocument: facture?.numero,
+                entiteNom: t('factures.title', 'Facture'),
+                type: 'vente',
+                notes: `Vente Facture ${facture?.numero ?? ''}`,
+              });
               changedIds.push(l.produit_id);
             }
           }
@@ -748,13 +769,8 @@ export function FacturesList() {
           .select('produit_id, quantite')
           .eq('facture_id', id);
 
-        if (lignes) {
-          for (const l of lignes) {
-            if (l.produit_id) {
-              await updateStockAndNotify(user?.id, l.produit_id, Number(l.quantite));
-            }
-          }
-        }
+        // Restore quantities to their original batches (FEFO reverse).
+        await restoreStockForDocument(user?.id, facture?.numero, lignes || []);
         updateData.stock_updated = false;
       }
 

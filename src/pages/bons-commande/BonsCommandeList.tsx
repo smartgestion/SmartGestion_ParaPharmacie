@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { Link } from 'react-router-dom'
+import { createBatchesForDelivery, removeBatchesForDelivery, getExpirationSettings } from '@/lib/batches'
 
 interface BonCommande {
   id: number;
@@ -243,6 +244,9 @@ export function BonsCommandeList() {
           prixVenteTtc: Number(l.prix_vente_ttc || 0),
           montantHt: Number(l.montant_ht || 0),
           montantTtc: Number(l.montant_ttc || 0),
+          numeroLot: l.numero_lot ?? '',
+          datePeremption: l.date_peremption ? String(l.date_peremption).split('T')[0] : '',
+          alertBeforeDays: Number(l.alert_before_days ?? 30),
         })),
       };
 
@@ -444,52 +448,6 @@ export function BonsCommandeList() {
     }
 
     // --- 4. stock movement sync (idempotent via stock_updated) ---------
-    const adjustStock = async (
-      produitId: number,
-      delta: number,
-      type: string,
-      notes: string,
-      bonNumero: string | undefined,
-      fournisseurNom: string | undefined,
-      prixUnitaire?: number,
-      clampToZero?: boolean,
-    ) => {
-      if (!produitId) return
-      const { data: produit } = await supabase
-        .from('produits')
-        .select('stock_actuel')
-        .eq('id', produitId)
-        .single()
-      if (!produit) return
-      const currentStock = Number(produit.stock_actuel || 0)
-      const candidateStock = currentStock + delta
-      const newStock = clampToZero
-        ? Math.max(0, candidateStock)
-        : candidateStock
-      if (!clampToZero && newStock < 0) {
-        throw new Error(
-          `Stock insuffisant pour le produit ${produitId}. ` +
-            `Stock actuel: ${currentStock}, tentative: ${delta}`,
-        )
-      }
-      await supabase
-        .from('produits')
-        .update({ stock_actuel: newStock })
-        .eq('id', produitId)
-      await supabase.from('mouvements_stock').insert([
-        {
-          produit_id: produitId,
-          type,
-          quantite: delta,
-          notes,
-          reference_document: bonNumero,
-          entite_nom: fournisseurNom,
-          prix_unitaire: prixUnitaire || 0,
-          date_mouvement: new Date().toISOString(),
-        },
-      ])
-    }
-
     // Only fetch lignes/context if we actually need to move stock.
     const needStockAdd = isNowLivré && !wasStockUpdated
     const needStockRevert = !isNowLivré && wasStockUpdated
@@ -508,48 +466,65 @@ export function BonsCommandeList() {
       const bonNumero: string | undefined = b?.numero
 
       if (needStockAdd && currentLignes && currentLignes.length > 0) {
-        for (const l of currentLignes as any[]) {
-          if (!l.produit_id) continue
-          try {
-            await adjustStock(
-              l.produit_id,
-              Number(l.quantite || 0),
-              'achat',
-              `Réception Bon de Commande ${bonNumero ?? ''}`,
-              bonNumero,
-              fournisseurNom,
-              l.prix_unitaire_ht,
-              /* clampToZero */ false,
-            )
-          } catch (stockErr) {
-            console.error(
-              `[changeBonCommandeStatus] stock increment failed for produit ${l.produit_id}:`,
-              stockErr,
-            )
+        // Create one Product Batch (Lot) per delivered line. Each batch carries
+        // its own expiration/lot; the product stock is re-synced to the sum of
+        // active batches. Also journal a stock movement per line for tracing.
+        try {
+          const expSettings = await getExpirationSettings(user?.id)
+          await createBatchesForDelivery({
+            userId: user?.id,
+            bonCommandeId: id,
+            supplierId: b?.fournisseur_id ?? null,
+            lines: (currentLignes as any[]).map((l) => ({
+              produit_id: l.produit_id,
+              quantite: Number(l.quantite || 0),
+              prix_unitaire_ht: l.prix_unitaire_ht,
+              numero_lot: l.numero_lot,
+              date_peremption: l.date_peremption,
+              alert_before_days: l.alert_before_days,
+            })),
+            settings: expSettings,
+          })
+          for (const l of currentLignes as any[]) {
+            if (!l.produit_id) continue
+            await supabase.from('mouvements_stock').insert([
+              {
+                produit_id: l.produit_id,
+                type: 'achat',
+                quantite: Number(l.quantite || 0),
+                notes: `Réception Bon de Commande ${bonNumero ?? ''}`,
+                reference_document: bonNumero,
+                entite_nom: fournisseurNom,
+                prix_unitaire: l.prix_unitaire_ht || 0,
+                date_mouvement: new Date().toISOString(),
+              },
+            ])
           }
+        } catch (stockErr) {
+          console.error('[changeBonCommandeStatus] batch creation failed:', stockErr)
         }
       } else if (needStockRevert && currentLignes && currentLignes.length > 0) {
-        // Revert stock — clamp to 0 so a low/zero stock does not block the
-        // administrative status change.
-        for (const l of currentLignes as any[]) {
-          if (!l.produit_id) continue
-          try {
-            await adjustStock(
-              l.produit_id,
-              -Number(l.quantite || 0),
-              'ajustement',
-              `Annulation Réception Bon de Commande ${bonNumero ?? ''}`,
-              bonNumero,
-              fournisseurNom,
-              l.prix_unitaire_ht,
-              /* clampToZero */ true,
-            )
-          } catch (stockErr) {
-            console.error(
-              `[changeBonCommandeStatus] stock revert failed for produit ${l.produit_id}:`,
-              stockErr,
-            )
+        // Revert: remove the batches created for this BC and re-sync stock.
+        try {
+          const expSettings = await getExpirationSettings(user?.id)
+          await removeBatchesForDelivery(id, expSettings)
+          for (const l of currentLignes as any[]) {
+            if (!l.produit_id) continue
+            await supabase.from('mouvements_stock').insert([
+              {
+                produit_id: l.produit_id,
+                type: 'ajustement',
+                quantite: -Number(l.quantite || 0),
+                notes: `Annulation Réception Bon de Commande ${bonNumero ?? ''}`,
+                reference_document: bonNumero,
+                entite_nom: fournisseurNom,
+                prix_unitaire: l.prix_unitaire_ht || 0,
+                date_mouvement: new Date().toISOString(),
+              },
+            ])
           }
+        } catch (stockErr) {
+          console.error('[changeBonCommandeStatus] batch revert failed:', stockErr)
         }
       }
 

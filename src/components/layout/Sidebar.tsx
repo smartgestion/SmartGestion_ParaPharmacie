@@ -5,7 +5,7 @@ import {
   Sparkles, Stethoscope, LayoutDashboard, FileText, ShoppingCart, Package, 
   Users, Building2, Settings, ChevronLeft, ChevronRight, LogOut,
   X, Receipt, ClipboardList, Truck, DollarSign, FileCheck, FolderArchive, Percent,
-  BarChart3
+  BarChart3, Boxes
 } from 'lucide-react';
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -56,6 +56,7 @@ const navigationGroups = [
     titleKey: 'nav.stock',
     items: [
       { nameKey: 'navigation.products', href: '/produits', icon: Package },
+      { nameKey: 'navigation.batches', href: '/lots', icon: Boxes },
     ]
   },
   {

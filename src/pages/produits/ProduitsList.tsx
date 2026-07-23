@@ -2,8 +2,9 @@ import React, { useEffect, useState, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   ArrowLeft, Plus, Search, FileEdit, Trash2, Package, AlertTriangle,
-  ChevronLeft, ChevronRight, ImageIcon
+  ChevronLeft, ChevronRight, ImageIcon, Layers
 } from 'lucide-react';
+import { ProductBatchesDialog } from '@/components/batches/ProductBatchesDialog'
 import { formatCurrency, htToTtc } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -57,6 +58,7 @@ export function ProduitsList() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingProduit, setEditingProduit] = useState<Produit | null>(null);
+  const [batchesProduit, setBatchesProduit] = useState<Produit | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [produitToDelete, setProduitToDelete] = useState<number | null>(null);
@@ -290,6 +292,13 @@ export function ProduitsList() {
         description={t('shared.confirm_delete.body_product')}
       />
 
+      <ProductBatchesDialog
+        open={!!batchesProduit}
+        onOpenChange={(o) => { if (!o) setBatchesProduit(null); }}
+        produitId={batchesProduit?.id ?? null}
+        produitName={batchesProduit?.designation || batchesProduit?.nom}
+      />
+
       <CatalogSearch
         open={catalogOpen}
         onOpenChange={setCatalogOpen}
@@ -497,6 +506,15 @@ export function ProduitsList() {
                         </TableCell>
                         <TableCell className="px-4 py-5 text-right">
                           <div className="flex justify-end gap-0.5">
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-slate-400 hover:text-teal-600 hover:bg-teal-50 rounded-[4px] dark:text-slate-400 dark:hover:text-teal-400 dark:hover:bg-teal-500/10"
+                              onClick={() => setBatchesProduit(produit)}
+                              title={t('lots.inventory_batches', 'Lots en stock')}
+                            >
+                              <Layers className="h-4 w-4" />
+                            </Button>
                             <Button
                               variant="ghost"
                               size="icon"

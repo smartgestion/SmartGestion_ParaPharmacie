@@ -27,7 +27,8 @@ import { Label } from '@/components/ui/label'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { updateStockAndNotify, ensureLowStockNotifications } from '@/lib/notifications'
+import { updateStockAndNotify, ensureLowStockNotifications, sellStockFEFO, restoreStockForDocument } from '@/lib/notifications'
+import { validateFEFOAvailability } from '@/lib/batches'
 import { ProductSelector } from '@/components/ui/ProductSelector'
 import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 import { ScanBarcode } from 'lucide-react'
@@ -244,6 +245,28 @@ export default function VentesPassagers() {
     const totalCogs = panier.reduce((sum, item) => sum + (Number(item.prixAchatHt || 0) * item.quantite), 0);
 
     try {
+      // Block the sale up front if non-expired batch stock can't cover it (FEFO).
+      const availabilityProblems = await validateFEFOAvailability(
+        user?.id,
+        panier.map((item) => ({
+          produitId: item.produitId,
+          quantity: item.quantite,
+          designation: item.designation,
+        })),
+      );
+      if (availabilityProblems.length > 0) {
+        const p = availabilityProblems[0];
+        toast.error(
+          t('lots.toast_insufficient_stock', {
+            product: p.designation || `#${p.produitId}`,
+            available: p.available,
+            requested: p.requested,
+            defaultValue: `Stock non périmé insuffisant pour ${p.designation || p.produitId} (disponible: ${p.available}, demandé: ${p.requested}).`,
+          }),
+        );
+        return;
+      }
+
       let numero: string | undefined;
       const year = new Date().getFullYear();
       let attempts = 0;
@@ -318,7 +341,12 @@ export default function VentesPassagers() {
       }
 
       for (const item of panier) {
-        await updateStockAndNotify(user?.id, item.produitId, -item.quantite);
+        await sellStockFEFO(user?.id, item.produitId, item.quantite, {
+          referenceDocument: numero,
+          entiteNom: 'Passager',
+          type: 'vente',
+          notes: `Vente Passager ${numero}`,
+        });
       }
       await ensureLowStockNotifications(user?.id);
 
@@ -334,8 +362,13 @@ export default function VentesPassagers() {
 
   const handleDelete = async (id: string) => {
     try {
-      // Fetch the sale lines before deleting so we can restore the stock
-      // that was decremented when the sale was created.
+      // Fetch the sale header + lines before deleting so we can restore the
+      // stock (to the exact origin batches) that was decremented at sale time.
+      const { data: vente } = await supabase
+        .from('ventes_passagers')
+        .select('numero')
+        .eq('id', id)
+        .maybeSingle();
       const { data: lignes } = await supabase
         .from('ventes_passagers_lignes')
         .select('produit_id, quantite')
@@ -344,10 +377,14 @@ export default function VentesPassagers() {
       const { error } = await supabase.from('ventes_passagers').delete().eq('id', id);
       if (error) throw error;
 
-      // Put the sold quantities back into stock (inverse of the sale).
-      for (const ligne of lignes || []) {
-        if (ligne.produit_id) {
-          await updateStockAndNotify(user?.id, ligne.produit_id, Number(ligne.quantite || 0));
+      // Put the sold quantities back into their original batches (FEFO reverse).
+      if (vente?.numero) {
+        await restoreStockForDocument(user?.id, vente.numero, lignes || []);
+      } else {
+        for (const ligne of lignes || []) {
+          if (ligne.produit_id) {
+            await updateStockAndNotify(user?.id, ligne.produit_id, Number(ligne.quantite || 0));
+          }
         }
       }
 

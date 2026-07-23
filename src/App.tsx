@@ -13,6 +13,7 @@ import VentesPassagers from './pages/ventes-passagers/VentesPassagers'
 import { ClientsList } from './pages/clients/ClientsList'
 import { FournisseursList } from './pages/fournisseurs/FournisseursList'
 import { ProduitsList } from './pages/produits/ProduitsList'
+import { LotsList } from './pages/lots/LotsList'
 import { FacturesList } from './pages/factures/FacturesList'
 import { AvoirsList } from './pages/avoirs/AvoirsList'
 import { AvoirsFournisseurList } from './pages/avoirs-fournisseur/AvoirsFournisseurList'
@@ -84,6 +85,7 @@ export default function App() {
               <Route path="clients" element={<ClientsList />} />
               <Route path="fournisseurs" element={<FournisseursList />} />
               <Route path="produits" element={<ProduitsList />} />
+              <Route path="lots" element={<LotsList />} />
               <Route path="factures" element={<FacturesList />} />
               <Route path="ventes-passagers" element={<VentesPassagers />} />
               <Route path="avoirs" element={<AvoirsList />} />

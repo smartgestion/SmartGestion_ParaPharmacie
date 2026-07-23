@@ -24,6 +24,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { KPICard } from '@/components/ui/kpi-card'
 import { ProductAnalytics } from '@/components/dashboard/ProductAnalytics'
+import { ExpirationOverview } from '@/components/dashboard/ExpirationOverview'
 import { ProductSalesFilter } from '@/components/dashboard/ProductSalesFilter'
 import { useTranslation } from 'react-i18next'
 
@@ -750,6 +751,9 @@ export function Dashboard() {
           iconContainerClass="bg-emerald-50 border border-emerald-200/60 text-emerald-600 dark:bg-emerald-500/10 dark:border-emerald-500/20 dark:text-emerald-400"
         />
       </div>
+
+      {/* ── Expiration overview (batch / lot monitoring) ──────────────────── */}
+      <ExpirationOverview />
 
       {/* ── Main content row: Chart + Recent Invoices ─────────────────────── */}
       {/*

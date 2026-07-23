@@ -19,8 +19,9 @@ const PurchasesSection = React.lazy(() => import('@/components/reports/sections/
 const FinanceSection = React.lazy(() => import('@/components/reports/sections/FinanceSection').then((m) => ({ default: m.FinanceSection })))
 const CustomersSection = React.lazy(() => import('@/components/reports/sections/CustomersSection').then((m) => ({ default: m.CustomersSection })))
 const PerformanceSection = React.lazy(() => import('@/components/reports/sections/PerformanceSection').then((m) => ({ default: m.PerformanceSection })))
+const ExpirationSection = React.lazy(() => import('@/components/reports/sections/ExpirationSection').then((m) => ({ default: m.ExpirationSection })))
 
-const TABS = ['sales', 'products', 'inventory', 'purchases', 'finance', 'customers', 'performance'] as const
+const TABS = ['sales', 'products', 'inventory', 'purchases', 'finance', 'customers', 'performance', 'expiration'] as const
 type TabKey = typeof TABS[number]
 
 export function ReportsPage() {
@@ -114,6 +115,7 @@ export function ReportsPage() {
                     {tab === 'finance' && <FinanceSection data={data} isRTL={isRTL} rangeLabel={rangeLabel} />}
                     {tab === 'customers' && <CustomersSection {...sectionProps} />}
                     {tab === 'performance' && <PerformanceSection data={data} isRTL={isRTL} rangeLabel={rangeLabel} />}
+                    {tab === 'expiration' && <ExpirationSection isRTL={isRTL} rangeLabel={rangeLabel} />}
                   </Suspense>
                 </div>
               </Tabs>

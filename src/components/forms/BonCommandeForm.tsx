@@ -22,7 +22,8 @@ import {
 import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
-import { updateStockAndNotify, ensureLowStockNotifications } from '@/lib/notifications'
+import { ensureLowStockNotifications } from '@/lib/notifications'
+import { createBatchesForDelivery, removeBatchesForDelivery, getExpirationSettings } from '@/lib/batches'
 
 interface BCFormProps {
   initialData?: any;
@@ -66,6 +67,9 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
     tva: z.number().min(0, t('shared.validation.vat_positive')),
     remise: z.number().optional(),
     prixVenteTtc: z.number().optional(),
+    numeroLot: z.string().optional(),
+    datePeremption: z.string().optional(),
+    alertBeforeDays: z.number().optional(),
   });
 
   const bcSchema = z.object({
@@ -141,7 +145,12 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
               remise: Number(l.remise || 0),
               prixVenteTtc: Number(l.prixVenteTtc || 0),
               montantHt: Number(l.montantHt || 0),
-              montantTtc: Number(l.montantTtc || 0)
+              montantTtc: Number(l.montantTtc || 0),
+              numeroLot: l.numeroLot ?? l.numero_lot ?? '',
+              datePeremption: (l.datePeremption ?? l.date_peremption)
+                ? new Date(l.datePeremption ?? l.date_peremption).toISOString().split('T')[0]
+                : '',
+              alertBeforeDays: Number(l.alertBeforeDays ?? l.alert_before_days ?? 30),
             })) || []
           });
         } else {
@@ -302,6 +311,9 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
           prix_vente_ttc: Number(ligne.prixVenteTtc || 0),
           montant_ht: mht,
           montant_ttc: mttc,
+          numero_lot: ligne.numeroLot || null,
+          date_peremption: ligne.datePeremption || null,
+          alert_before_days: Number(ligne.alertBeforeDays || 30),
           ordre: index,
         };
       });
@@ -323,35 +335,32 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
         const wantStock = isLivréStatus(data.statut);
 
         if (wantStock && priorStockUpdated === 0) {
-          const changedIds: (number | string)[] = [];
-          for (const ligne of lignesPayload) {
-            if (ligne.produit_id) {
-              await updateStockAndNotify(user?.id, ligne.produit_id, Number(ligne.quantite));
-              changedIds.push(ligne.produit_id);
-            }
-          }
+          // Create one Product Batch (Lot) per delivered line. This also
+          // re-syncs each product's stock_actuel to the sum of active batches.
+          const expSettings = await getExpirationSettings(user?.id);
+          await createBatchesForDelivery({
+            userId: user?.id,
+            bonCommandeId: bonId,
+            supplierId: fournisseurId,
+            lines: lignesPayload.map((l) => ({
+              produit_id: l.produit_id,
+              quantite: l.quantite,
+              prix_unitaire_ht: l.prix_unitaire_ht,
+              numero_lot: l.numero_lot,
+              date_peremption: l.date_peremption,
+              alert_before_days: l.alert_before_days,
+            })),
+            settings: expSettings,
+          });
+          const changedIds = lignesPayload
+            .filter((l) => l.produit_id)
+            .map((l) => l.produit_id as number);
           await ensureLowStockNotifications(user?.id, changedIds);
           await supabase.from('bons_commande').update({ stock_updated: 1 }).eq('id', bonId);
         } else if (!wantStock && priorStockUpdated === 1) {
-          // Revert stock — clamped to zero so already-consumed inventory
-          // doesn't block the administrative status change. We bypass
-          // `updateStockAndNotify` here because that helper refuses to go
-          // negative, which would silently skip the revert.
-          for (const ligne of lignesPayload) {
-            if (!ligne.produit_id) continue;
-            const { data: produit } = await supabase
-              .from('produits')
-              .select('stock_actuel')
-              .eq('id', ligne.produit_id)
-              .single();
-            if (!produit) continue;
-            const current = Number(produit.stock_actuel || 0);
-            const next = Math.max(0, current - Number(ligne.quantite || 0));
-            await supabase
-              .from('produits')
-              .update({ stock_actuel: next })
-              .eq('id', ligne.produit_id);
-          }
+          // Revert: remove the batches created for this BC and re-sync stock.
+          const expSettings = await getExpirationSettings(user?.id);
+          await removeBatchesForDelivery(bonId, expSettings);
           await supabase.from('bons_commande').update({ stock_updated: 0 }).eq('id', bonId);
           // The auto-generated BL (if any) should disappear with the revert
           // so the two views stay in sync.
@@ -524,7 +533,7 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
             disabled={locked}
             className="border-orange-200 text-orange-700 hover:bg-orange-50 dark:border-orange-500/30 dark:text-orange-400 dark:hover:bg-orange-500/10 disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={() =>
-              append({ designation: '', quantite: 1, prixUnitaireHt: 0, tva: 20 })
+              append({ designation: '', quantite: 1, prixUnitaireHt: 0, tva: 20, numeroLot: '', datePeremption: '', alertBeforeDays: 30 })
             }
           >
             <Plus className="h-4 w-4 mr-2" />
@@ -544,6 +553,8 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
                 <th className="p-3 text-right font-semibold text-slate-600 dark:text-slate-400 w-24">{t('shared.form.qty_label')}</th>
                 <th className="p-3 text-right font-semibold text-slate-600 dark:text-slate-400 w-32">{t('shared.form.price_ttc_label')}</th>
                 <th className="p-3 text-right font-semibold text-slate-600 dark:text-slate-400 w-24">{t('shared.form.vat_pct_label')}</th>
+                <th className="p-3 text-start font-semibold text-slate-600 dark:text-slate-400 w-32">{t('lots.lot_number', 'N° Lot')}</th>
+                <th className="p-3 text-start font-semibold text-slate-600 dark:text-slate-400 w-36">{t('lots.expiration_date', 'Péremption')}</th>
                 <th className="p-3 text-right font-semibold text-slate-600 dark:text-slate-400 w-32">{t('shared.form.total_ttc')}</th>
                 <th className="p-3 w-24"></th>
               </tr>
@@ -601,6 +612,22 @@ export function BonCommandeForm({ initialData, onSuccess }: BCFormProps) {
                         disabled={locked}
                         className="h-9 text-right bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
                         {...form.register(`lignes.${index}.tva`, { valueAsNumber: true })}
+                      />
+                    </td>
+                    <td className="p-2">
+                      <Input
+                        disabled={locked}
+                        placeholder={t('lots.lot_number_ph', 'Lot')}
+                        className="h-9 bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                        {...form.register(`lignes.${index}.numeroLot`)}
+                      />
+                    </td>
+                    <td className="p-2">
+                      <Input
+                        type="date"
+                        disabled={locked}
+                        className="h-9 bg-white border-slate-200 dark:bg-slate-950/50 dark:border-white/10 dark:text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                        {...form.register(`lignes.${index}.datePeremption`)}
                       />
                     </td>
                     <td className="p-2 text-right font-semibold text-slate-700 align-middle dark:text-white">

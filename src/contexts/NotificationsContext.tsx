@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, ReactNode, useCallback,
 import { supabase } from '@/lib/supabase'
 import { useAuth } from './AuthContext'
 import { RealtimePostgresChangesPayload } from '@supabase/supabase-js'
-import { ensureLowStockNotifications, updateStockAndNotify } from '@/lib/notifications'
+import { ensureLowStockNotifications, updateStockAndNotify, ensureExpirationNotifications } from '@/lib/notifications'
 
 export interface Notification {
   id: string;
@@ -68,6 +68,8 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     fetchNotifications();
     if (user?.id) {
       ensureLowStockNotifications(user.id);
+      // Scan batches on startup and raise persistent expiration alerts.
+      ensureExpirationNotifications(user.id).then(() => fetchNotifications());
     }
   }, [fetchNotifications, user?.id]);
 
