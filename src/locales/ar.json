@@ -1924,5 +1924,27 @@
       "alert_outstanding": "{{count}} عميل بمدفوعات مستحقة ({{amount}})",
       "alert_inactive_customers": "{{count}} عميل غير نشط منذ 60+ يوماً"
     }
+  },
+  "catalog": {
+    "search_title": "البحث في الكاطالوغ",
+    "search_ph": "الاسم، الماركة أو الباركود...",
+    "quick_add_button": "الكاطالوغ",
+    "type_to_search": "اكتب على الأقل حرفين للبحث.",
+    "no_results": "لم يتم العثور على أي منتج في الكاطالوغ.",
+    "count_hint": "{{count}} منتج في الكاطالوغ",
+    "import_button": "استيراد الكاطالوغ",
+    "import_tooltip": "استيراد الكاطالوغ المرجعي",
+    "importing": "جارٍ الاستيراد...",
+    "importing_pct": "جارٍ الاستيراد... {{pct}}%",
+    "import_success": "تم استيراد {{count}} منتج إلى الكاطالوغ.",
+    "import_error": "فشل استيراد الكاطالوغ.",
+    "desktop_only": "متاح فقط في تطبيق سطح المكتب."
+  },
+  "scanner": {
+    "active_hint": "قارئ الباركود نشط",
+    "unknown_barcode": "الباركود غير موجود: {{code}}",
+    "scanned_added": "تمت إضافة المنتج الممسوح",
+    "product_exists": "المنتج موجود بالفعل: {{name}}",
+    "new_barcode": "باركود جديد: {{code}}"
   }
 }

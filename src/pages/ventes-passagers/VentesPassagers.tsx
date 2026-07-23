@@ -29,6 +29,8 @@ import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
 import { updateStockAndNotify, ensureLowStockNotifications } from '@/lib/notifications'
 import { ProductSelector } from '@/components/ui/ProductSelector'
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
+import { ScanBarcode } from 'lucide-react'
 // Ticket-print customisation — read on each handlePrint() so the latest
 // user settings (configured in Parametres → Apparence) are always applied.
 import { readTicketSettings, fontToFamily, sizeToPx } from '@/lib/ticketSettings'
@@ -49,6 +51,7 @@ interface Produit {
    nom?: string;
    designation?: string;
    reference?: string;
+   barcode?: string;
    prixVenteHt: number;
    prix_vente_ht?: number;
    prixVenteTtc?: number;
@@ -84,6 +87,7 @@ export default function VentesPassagers() {
     id: p.id,
     reference: p.reference || '',
     designation: p.designation || p.nom || '',
+    barcode: (p.barcode ?? '').toString().trim(),
     marque: p.marque || '',
     prixVenteHt: Number(p.prix_vente_ht || p.prixVenteHt || 0),
     prixVenteTtc: Number(p.prix_vente_ttc || 0),
@@ -153,6 +157,66 @@ export default function VentesPassagers() {
   const removeFromPanier = (index: number) => {
     setPanier(panier.filter((_, i) => i !== index));
   };
+
+  // Add a product to the cart (or bump its quantity if already present).
+  // Uses functional setState so it is safe to call from event handlers such
+  // as the barcode scanner (which may hold a stale `panier` closure).
+  const addProduitToPanier = (produit: any, qte: number = 1) => {
+    const tvaRate = Number(produit.tauxTva ?? 20);
+    const ttcProd = Number(produit.prixVenteTtc ?? 0);
+    const puHt = ttcProd > 0 ? ttcToHt(ttcProd, tvaRate) : Number(produit.prixVenteHt ?? 0);
+
+    setPanier((prev) => {
+      const existingIndex = prev.findIndex(
+        (item) => Number(item.produitId) === Number(produit.id),
+      );
+      if (existingIndex >= 0) {
+        const existing = prev[existingIndex];
+        const newQte = existing.quantite + qte;
+        const newMht = existing.prixUnitaireHt * newQte;
+        const newMtva = newMht * (existing.tva / 100);
+        return prev.map((item, idx) =>
+          idx === existingIndex
+            ? { ...item, quantite: newQte, montantHt: newMht, montantTva: newMtva, montantTtc: newMht + newMtva }
+            : item,
+        );
+      }
+      const mht = puHt * qte;
+      const mtva = mht * (tvaRate / 100);
+      return [
+        ...prev,
+        {
+          produitId: produit.id,
+          designation: produit.designation || t('shared.table.product'),
+          quantite: qte,
+          prixUnitaireHt: puHt,
+          tva: tvaRate,
+          montantHt: mht,
+          montantTva: mtva,
+          montantTtc: mht + mtva,
+          prixAchatHt: Number(produit.prixAchatHt ?? 0),
+        },
+      ];
+    });
+    toast.success(t('ventes.toast_item_added', { name: produit.designation || t('shared.table.product') }));
+  };
+
+  // USB barcode scanner: resolve the scanned code against the loaded products
+  // and add it to the cart. Only active while the sale form is open.
+  const handleScan = (code: string) => {
+    const norm = code.trim();
+    if (!norm) return;
+    const match = produits.find(
+      (p: any) => (p.barcode || '').toString().trim() === norm,
+    );
+    if (match) {
+      addProduitToPanier(match, 1);
+    } else {
+      toast.error(t('scanner.unknown_barcode', { code: norm }));
+    }
+  };
+
+  useBarcodeScanner({ onScan: handleScan, enabled: showForm });
 
   // Allow editing the unit selling price of a cart line (e.g. when
   // negotiating with the client). The user edits the TTC price; the HT
@@ -841,44 +905,7 @@ export default function VentesPassagers() {
               <div className="p-6 space-y-4">
                 <ProductSelector
                   produits={produits}
-                  onSelect={(produit, qte) => {
-                    const tvaRate = Number(produit.tauxTva ?? 20);
-                    // Préférer le TTC catalogue (conversion exacte) ; le HT
-                    // reste la valeur stockée en interne.
-                    const ttcProd = Number(produit.prixVenteTtc ?? 0);
-                    const puHt = ttcProd > 0 ? ttcToHt(ttcProd, tvaRate) : Number(produit.prixVenteHt ?? 0);
-                    const mht = puHt * qte;
-                    const mtva = mht * (tvaRate / 100);
-                    const mttc = mht + mtva;
-
-                    const existingIndex = panier.findIndex(item => Number(item.produitId) === Number(produit.id));
-                    if (existingIndex >= 0) {
-                      const existing = panier[existingIndex];
-                      const newQte = existing.quantite + qte;
-                      const newMht = existing.prixUnitaireHt * newQte;
-                      const newMtva = newMht * (existing.tva / 100);
-                      const newMttc = newMht + newMtva;
-
-                      setPanier(panier.map((item, idx) =>
-                        idx === existingIndex
-                          ? { ...item, quantite: newQte, montantHt: newMht, montantTva: newMtva, montantTtc: newMttc }
-                          : item
-                      ));
-                    } else {
-                      setPanier([...panier, {
-                        produitId: produit.id,
-                        designation: produit.designation || t('shared.table.product'),
-                        quantite: qte,
-                        prixUnitaireHt: puHt,
-                        tva: tvaRate,
-                        montantHt: mht,
-                        montantTva: mtva,
-                        montantTtc: mttc,
-                        prixAchatHt: Number(produit.prixAchatHt ?? 0)
-                      }]);
-                    }
-                    toast.success(t('ventes.toast_item_added', { name: produit.designation || t('shared.table.product') }));
-                  }}
+                  onSelect={(produit, qte) => addProduitToPanier(produit, qte)}
                   trigger={
                     <Button className="w-full h-12 bg-emerald-500 hover:bg-emerald-600 text-white font-semibold rounded-sm shadow-none text-base">
                       <ShoppingCart className="mr-2 h-5 w-5" />
@@ -886,6 +913,10 @@ export default function VentesPassagers() {
                     </Button>
                   }
                 />
+                <div className="flex items-center justify-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                  <ScanBarcode className="h-3.5 w-3.5" />
+                  <span>{t('scanner.active_hint', 'Scanner code-barres actif')}</span>
+                </div>
                 <p className="text-xs text-slate-400 text-center">
                   {t('ventes.select_product_hint')}
                 </p>

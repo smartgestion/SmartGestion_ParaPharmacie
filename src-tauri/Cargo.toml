@@ -21,7 +21,7 @@ tauri-build = { version = "2.6.2", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 log = "0.4"
-tauri = { version = "2.11.2", features = [] }
+tauri = { version = "2.11.2", features = ["protocol-asset"] }
 tauri-plugin-log = "2"
 
 # SQLite (bundled = embeds SQLite source, no system dependency required)
@@ -57,6 +57,12 @@ machine-uid = "0.5"
 # crosses the IPC boundary so the OS-level identifier itself never reaches
 # the frontend / cloud.
 sha2 = "0.10"
+
+# HTTP client used to download product images from the reference catalogue
+# to the local disk. `blocking` keeps the command synchronous (it runs on a
+# Tauri command thread), and `rustls-tls` avoids a system OpenSSL dependency
+# on Windows. Default features are disabled to keep the binary lean.
+reqwest = { version = "0.12", default-features = false, features = ["blocking", "rustls-tls"] }
 
 # ---------------------------------------------------------------------------
 # Release profile — tuned for the production desktop installer.

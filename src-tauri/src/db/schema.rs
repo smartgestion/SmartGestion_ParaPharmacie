@@ -664,6 +664,80 @@ pub const MIGRATIONS: &[&str] = &[
     "#,
 
     // -----------------------------------------------------------------
+    // Reference catalogue (Task: bundled 48k-product catalogue)
+    //
+    // Read-only reference data imported from an Excel catalogue. It is NOT
+    // the user's own stock (`produits`); it only helps the user find and
+    // pre-fill a product quickly. Not scoped by user_id (shared reference).
+    // -----------------------------------------------------------------
+    r#"
+    CREATE TABLE IF NOT EXISTS catalog_products (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        barcode       TEXT,
+        nom           TEXT    NOT NULL,
+        marque        TEXT,
+        image_url     TEXT,
+        description   TEXT,
+        created_at    TEXT    DEFAULT CURRENT_TIMESTAMP
+    );
+    "#,
+
+    // Full-text search index over catalogue products (nom + marque + barcode).
+    // `content=` makes it an external-content FTS table backed by
+    // catalog_products, kept in sync by the triggers below.
+    r#"
+    CREATE VIRTUAL TABLE IF NOT EXISTS catalog_fts USING fts5(
+        nom,
+        marque,
+        barcode,
+        content='catalog_products',
+        content_rowid='id',
+        tokenize='unicode61 remove_diacritics 2'
+    );
+    "#,
+
+    r#"
+    CREATE TRIGGER IF NOT EXISTS catalog_products_ai
+    AFTER INSERT ON catalog_products BEGIN
+        INSERT INTO catalog_fts(rowid, nom, marque, barcode)
+        VALUES (new.id, new.nom, new.marque, new.barcode);
+    END;
+    "#,
+
+    r#"
+    CREATE TRIGGER IF NOT EXISTS catalog_products_ad
+    AFTER DELETE ON catalog_products BEGIN
+        INSERT INTO catalog_fts(catalog_fts, rowid, nom, marque, barcode)
+        VALUES ('delete', old.id, old.nom, old.marque, old.barcode);
+    END;
+    "#,
+
+    r#"
+    CREATE TRIGGER IF NOT EXISTS catalog_products_au
+    AFTER UPDATE ON catalog_products BEGIN
+        INSERT INTO catalog_fts(catalog_fts, rowid, nom, marque, barcode)
+        VALUES ('delete', old.id, old.nom, old.marque, old.barcode);
+        INSERT INTO catalog_fts(rowid, nom, marque, barcode)
+        VALUES (new.id, new.nom, new.marque, new.barcode);
+    END;
+    "#,
+
+    // Queue of product images still to be downloaded (used when the machine
+    // was offline at add-time; retried when connectivity returns).
+    r#"
+    CREATE TABLE IF NOT EXISTS image_download_queue (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        produit_id    INTEGER,
+        image_url     TEXT    NOT NULL,
+        status        TEXT    DEFAULT 'pending',
+        attempts      INTEGER DEFAULT 0,
+        last_error    TEXT,
+        created_at    TEXT    DEFAULT CURRENT_TIMESTAMP,
+        updated_at    TEXT    DEFAULT CURRENT_TIMESTAMP
+    );
+    "#,
+
+    // -----------------------------------------------------------------
     // Helpful indexes on hot foreign-key paths
     // -----------------------------------------------------------------
     "CREATE INDEX IF NOT EXISTS idx_users_email                 ON users(email);",
@@ -690,6 +764,8 @@ pub const MIGRATIONS: &[&str] = &[
     "CREATE INDEX IF NOT EXISTS idx_notifications_user_id       ON notifications(user_id);",
     "CREATE INDEX IF NOT EXISTS idx_produits_reference          ON produits(reference);",
     "CREATE INDEX IF NOT EXISTS idx_produits_barcode            ON produits(barcode);",
+    "CREATE INDEX IF NOT EXISTS idx_catalog_barcode             ON catalog_products(barcode);",
+    "CREATE INDEX IF NOT EXISTS idx_img_queue_status            ON image_download_queue(status);",
     "CREATE INDEX IF NOT EXISTS idx_pf_folders_parent           ON portefeuille_folders(parent_id);",
     "CREATE INDEX IF NOT EXISTS idx_pf_folders_user             ON portefeuille_folders(user_id);",
     "CREATE INDEX IF NOT EXISTS idx_pf_files_folder             ON portefeuille_files(folder_id);",
@@ -716,6 +792,8 @@ pub const ADDITIVE_COLUMNS: &[&str] = &[
     "ALTER TABLE bon_livraison_client_lignes ADD COLUMN prix_vente_ttc REAL DEFAULT 0;",
     "ALTER TABLE bons_commande ADD COLUMN bl_fournisseur TEXT;",
     "ALTER TABLE bons_commande ADD COLUMN motif_annulation TEXT;",
+    // Local filesystem path of a downloaded product image (NULL until fetched).
+    "ALTER TABLE produits ADD COLUMN image_local TEXT;",
 ];
 
 /// Current schema version (bump when adding migrations).
@@ -724,4 +802,6 @@ pub const ADDITIVE_COLUMNS: &[&str] = &[
 ///   v2 — adds the `users` table for offline authentication (Task 4A).
 ///   v3 — adds the Portefeuille document-storage tables
 ///        (portefeuille_folders / _files / _papers).
-pub const SCHEMA_VERSION: i64 = 3;
+///   v4 — adds the reference catalogue (catalog_products + catalog_fts FTS5
+///        + sync triggers), the image_download_queue, and produits.image_local.
+pub const SCHEMA_VERSION: i64 = 4;

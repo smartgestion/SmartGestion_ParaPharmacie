@@ -183,6 +183,7 @@ export function ProductSelector({
     return (
       (p.designation || p.nom || '').toLowerCase().includes(searchLower) ||
       (p.reference || '').toLowerCase().includes(searchLower) ||
+      ((p as any).barcode || '').toLowerCase().includes(searchLower) ||
       (p.marque || '').toLowerCase().includes(searchLower)
     );
   });

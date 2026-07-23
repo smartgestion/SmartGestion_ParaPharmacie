@@ -1,4 +1,5 @@
 mod db;
+mod images;
 mod machine;
 
 use tauri::Manager;
@@ -41,6 +42,8 @@ pub fn run() {
             db::commands::has_local_users,
             // Device fingerprint (Task 7A)
             machine::get_machine_id,
+            // Product-image download (reference catalogue)
+            images::download_image,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

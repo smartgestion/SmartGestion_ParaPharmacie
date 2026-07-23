@@ -24,6 +24,11 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 import { cn } from '@/lib/utils'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/contexts/AuthContext'
+import { CatalogSearch, type CatalogPick } from '@/components/catalog/CatalogSearch'
+import { ImportCatalog } from '@/components/catalog/ImportCatalog'
+import { isTauri } from '@/lib/db/runtime'
+import { acquireImage, findByBarcode } from '@/lib/catalog/catalog'
+import { useBarcodeScanner } from '@/hooks/useBarcodeScanner'
 
 interface Produit {
   id: number;
@@ -56,6 +61,9 @@ export function ProduitsList() {
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [produitToDelete, setProduitToDelete] = useState<number | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  // Reference-catalogue quick-add (desktop only).
+  const [catalogOpen, setCatalogOpen] = useState(false);
+  const [catalogPrefill, setCatalogPrefill] = useState<Produit | null>(null);
 
   const mapProduit = (p: any) => ({
     ...p,
@@ -146,13 +154,90 @@ export function ProduitsList() {
 
   const openNewForm = () => {
     setEditingProduit(null);
+    setCatalogPrefill(null);
     setShowForm(true);
   };
 
   const closeForm = () => {
     setShowForm(false);
     setEditingProduit(null);
+    setCatalogPrefill(null);
   };
+
+  // A product was chosen from the reference catalogue: open the create form
+  // pre-filled with its name / brand / barcode / description / image. The
+  // user only needs to add price + stock. No `id` → this is a NEW product.
+  //
+  // The image is downloaded to disk now (if online); on failure the remote
+  // URL is kept and a retry is queued. Either way the form opens immediately.
+  const handleCatalogPick = (pick: CatalogPick) => {
+    setEditingProduit(null);
+    setCatalogPrefill({
+      nom: pick.nom,
+      designation: pick.nom,
+      marque: pick.marque,
+      barcode: pick.barcode,
+      description: pick.description,
+      imageUrl: pick.imageUrl,
+    } as unknown as Produit);
+    setShowForm(true);
+
+    // Fire-and-forget image download; patch the prefill when it resolves.
+    if (pick.imageUrl) {
+      acquireImage(pick.imageUrl)
+        .then((res) => {
+          if (res.downloaded) {
+            setCatalogPrefill((prev) =>
+              prev ? ({ ...prev, imageUrl: res.displayUrl } as Produit) : prev,
+            );
+          }
+        })
+        .catch(() => {
+          /* keep remote URL; retry is queued inside acquireImage */
+        });
+    }
+  };
+
+  // USB scanner on the products page (only when the form is NOT open):
+  //  - if a product with that barcode already exists -> open it for editing
+  //  - else look it up in the reference catalogue -> open a prefilled create form
+  //  - else open a create form with just the barcode filled in
+  const handleProductScan = async (code: string) => {
+    const norm = code.trim();
+    if (!norm) return;
+    const existing = produits.find((p) => (p.barcode || '').trim() === norm);
+    if (existing) {
+      toast.info(t('scanner.product_exists', { name: existing.designation || existing.nom }));
+      handleEdit(existing);
+      return;
+    }
+    let pick: CatalogPick | null = null;
+    try {
+      const c = await findByBarcode(norm);
+      if (c) {
+        pick = {
+          nom: c.nom || '',
+          marque: c.marque || '',
+          barcode: c.barcode || norm,
+          description: c.description || '',
+          imageUrl: c.image_url || '',
+        };
+      }
+    } catch {
+      /* ignore catalogue lookup errors */
+    }
+    if (pick) {
+      handleCatalogPick(pick);
+    } else {
+      // unknown: open a blank create form with the barcode prefilled
+      setEditingProduit(null);
+      setCatalogPrefill({ barcode: norm } as unknown as Produit);
+      setShowForm(true);
+      toast.info(t('scanner.new_barcode', { code: norm }));
+    }
+  };
+
+  useBarcodeScanner({ onScan: handleProductScan, enabled: !showForm });
 
   const filteredProduits = useMemo(() => {
     if (!searchQuery.trim()) return produits;
@@ -205,6 +290,12 @@ export function ProduitsList() {
         description={t('shared.confirm_delete.body_product')}
       />
 
+      <CatalogSearch
+        open={catalogOpen}
+        onOpenChange={setCatalogOpen}
+        onPick={handleCatalogPick}
+      />
+
       {showForm ? (
         <div className="space-y-4 sm:space-y-6">
           <div className="flex items-center gap-3">
@@ -222,7 +313,7 @@ export function ProduitsList() {
           </div>
           <div className="rounded-sm dark:bg-card dark:border-white/10 border border-slate-200 bg-white p-4 sm:p-6">
             <ProduitForm
-              initialData={editingProduit}
+              initialData={editingProduit ?? catalogPrefill}
               onSuccess={() => {
                 closeForm();
                 fetchProduits();
@@ -245,13 +336,28 @@ export function ProduitsList() {
                 </p>
               </div>
             </div>
-            <Button
-              onClick={openNewForm}
-              className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-[4px] h-10 px-5 shadow-none"
-            >
-              <Plus className="me-2 h-4 w-4" />
-              {t('produits.new_button')}
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              {isTauri() && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => setCatalogOpen(true)}
+                    className="w-full sm:w-auto font-semibold rounded-[4px] h-10 px-4 shadow-none"
+                  >
+                    <Search className="me-2 h-4 w-4" />
+                    {t('catalog.quick_add_button', 'Catalogue')}
+                  </Button>
+                  <ImportCatalog className="w-full sm:w-auto rounded-[4px] h-10 px-4 shadow-none" />
+                </>
+              )}
+              <Button
+                onClick={openNewForm}
+                className="w-full sm:w-auto bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-[4px] h-10 px-5 shadow-none"
+              >
+                <Plus className="me-2 h-4 w-4" />
+                {t('produits.new_button')}
+              </Button>
+            </div>
           </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">

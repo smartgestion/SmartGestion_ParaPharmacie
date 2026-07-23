@@ -186,3 +186,35 @@ export const rustAuth = {
 export function getMachineId(): Promise<string> {
   return invoke<string>('get_machine_id');
 }
+
+// ---------------------------------------------------------------------------
+// Product-image download (reference catalogue)
+// ---------------------------------------------------------------------------
+
+export interface DownloadedImage {
+  /** Absolute on-disk path of the saved file. */
+  path: string;
+  /** File name only. */
+  file_name: string;
+  /** Size in bytes. */
+  bytes: number;
+}
+
+/**
+ * Download a product image (http/https) to disk next to the local DB.
+ * Rejects when offline / on any HTTP error, so callers can fall back to the
+ * remote URL and enqueue a retry.
+ */
+export function downloadImage(url: string): Promise<DownloadedImage> {
+  return invoke<DownloadedImage>('download_image', { url });
+}
+
+/**
+ * Turn an absolute local file path into a URL the webview can render, using
+ * Tauri's asset protocol. Falls back to the raw path outside Tauri.
+ */
+export async function toAssetUrl(localPath: string): Promise<string> {
+  if (!isTauri()) return localPath;
+  const mod = await import('@tauri-apps/api/core');
+  return mod.convertFileSrc(localPath);
+}

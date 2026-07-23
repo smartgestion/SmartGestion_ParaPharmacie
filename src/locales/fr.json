@@ -1923,5 +1923,27 @@
       "alert_outstanding": "{{count}} client(s) avec paiements en attente ({{amount}})",
       "alert_inactive_customers": "{{count}} client(s) inactif(s) depuis 60+ jours"
     }
+  },
+  "catalog": {
+    "search_title": "Rechercher dans le catalogue",
+    "search_ph": "Nom, marque ou code-barres...",
+    "quick_add_button": "Catalogue",
+    "type_to_search": "Tapez au moins 2 caractères pour rechercher.",
+    "no_results": "Aucun produit trouvé dans le catalogue.",
+    "count_hint": "{{count}} produits dans le catalogue",
+    "import_button": "Importer catalogue",
+    "import_tooltip": "Importer le catalogue de référence",
+    "importing": "Import...",
+    "importing_pct": "Import... {{pct}}%",
+    "import_success": "{{count}} produits importés dans le catalogue.",
+    "import_error": "Échec de l'import du catalogue.",
+    "desktop_only": "Disponible uniquement dans l'application desktop."
+  },
+  "scanner": {
+    "active_hint": "Scanner code-barres actif",
+    "unknown_barcode": "Code-barres introuvable : {{code}}",
+    "scanned_added": "Produit scanné ajouté",
+    "product_exists": "Produit déjà existant : {{name}}",
+    "new_barcode": "Nouveau code-barres : {{code}}"
   }
 }

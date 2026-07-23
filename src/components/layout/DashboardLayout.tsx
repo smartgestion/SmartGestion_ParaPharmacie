@@ -11,6 +11,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useNotifications } from '@/contexts/NotificationsContext'
 import { cn } from '@/lib/utils'
 import { useTranslation } from 'react-i18next'
+import { startImageQueueWorker } from '@/lib/catalog/catalog'
 
 const routeMeta: Record<string, { titleKey: string; subtitleKey: string }> = {
   '/':                { titleKey: 'navigation.workspace',      subtitleKey: 'header.subtitles.workspace'      },
@@ -50,6 +51,13 @@ export function DashboardLayout() {
     const onChange = () => setIsFullscreen(Boolean(document.fullscreenElement));
     document.addEventListener('fullscreenchange', onChange);
     return () => document.removeEventListener('fullscreenchange', onChange);
+  }, []);
+
+  // Background worker: re-download product images that failed while offline
+  // (desktop only; no-op in the browser). Runs while the app shell is mounted.
+  useEffect(() => {
+    const stop = startImageQueueWorker();
+    return stop;
   }, []);
 
   const toggleFullscreen = useCallback(() => {

@@ -1924,5 +1924,27 @@
       "alert_outstanding": "{{count}} customer(s) with outstanding payments ({{amount}})",
       "alert_inactive_customers": "{{count}} customer(s) inactive for 60+ days"
     }
+  },
+  "catalog": {
+    "search_title": "Search the catalogue",
+    "search_ph": "Name, brand or barcode...",
+    "quick_add_button": "Catalogue",
+    "type_to_search": "Type at least 2 characters to search.",
+    "no_results": "No product found in the catalogue.",
+    "count_hint": "{{count}} products in the catalogue",
+    "import_button": "Import catalogue",
+    "import_tooltip": "Import the reference catalogue",
+    "importing": "Importing...",
+    "importing_pct": "Importing... {{pct}}%",
+    "import_success": "{{count}} products imported into the catalogue.",
+    "import_error": "Catalogue import failed.",
+    "desktop_only": "Available only in the desktop app."
+  },
+  "scanner": {
+    "active_hint": "Barcode scanner active",
+    "unknown_barcode": "Barcode not found: {{code}}",
+    "scanned_added": "Scanned product added",
+    "product_exists": "Product already exists: {{name}}",
+    "new_barcode": "New barcode: {{code}}"
   }
 }
